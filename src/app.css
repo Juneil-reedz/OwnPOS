@@ -246,3 +246,23 @@ table.t tr:last-child td{border-bottom:0}
 .updicon svg{flex:none}
 .updbar{height:12px;border-radius:999px;background:var(--surface-2);overflow:hidden}
 .updbar i{display:block;height:100%;background:#2343D9;border-radius:999px;transition:width .2s}
+
+/* owner PIN */
+.btn.sm2{min-height:34px;padding:5px 12px;font-size:13px}
+.pinbox{font-size:26px;letter-spacing:.4em;text-align:center;font-family:var(--font-mono)}
+.side .role{flex-wrap:wrap}
+/* payment QR */
+.payqr{display:flex;gap:16px;align-items:center;background:var(--surface-2);border-radius:16px;padding:12px;flex-wrap:wrap}
+.payqr img{width:150px;height:150px;object-fit:contain;background:#fff;border-radius:12px;padding:6px;flex:none}
+.paybig{font-size:28px;font-weight:800;letter-spacing:-.02em}
+.qrfull{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
+.qrfull img{width:min(78vw,360px);height:min(78vw,360px);object-fit:contain;background:#fff;border-radius:16px;padding:10px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+.qrset{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;padding-top:6px}
+.qrprev{width:110px;height:110px;border-radius:14px;background:var(--surface-2);display:grid;place-items:center;overflow:hidden;flex:none}
+.qrprev img{width:100%;height:100%;object-fit:contain;background:#fff}
+.linkbtn{border:0;background:none;padding:0;color:inherit;font-weight:800;text-decoration:underline;cursor:pointer}
+.qrcust{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:700px){.qrcust{grid-template-columns:minmax(0,1fr)}.qrcust .qrfull{order:-1}}
+.qrorder{background:var(--surface-2);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:8px}
+.qrlines{display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow:auto;padding:4px 0}
+.qrcust .qrfull img{width:min(78vw,300px);height:min(78vw,300px)}

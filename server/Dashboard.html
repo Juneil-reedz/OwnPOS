@@ -107,7 +107,7 @@ const HELP = {
   tiles: ["The numbers at the top", "A quick look at your business.", ["Stores: every store that has opened OwnPOS while online.", "On trial: stores still in their free 30 days.", "Paying: stores with a paid plan that hasn’t ended (or is in its 7-day grace period).", "Need attention: stores ending within 7 days or already ended in the last 7 days. These are the ones to remind.", "Collected this month: total of the licenses you issued this month."]],
   payments: ["Payments to approve", "Renewal requests stores sent from their app, with the GCash reference they typed.", ["Open your GCash app and check you really received that amount with that reference.", "Approve signs a license and sends it. The store’s app picks it up by itself the next time it’s online.", "Reject if you can’t find the payment. Contact the owner to sort it out."]],
   ending: ["Ending soon or ended", "Stores that need a nudge.", ["Text reminder opens your phone’s SMS app with a ready-made message.", "Renew lets you send them more time, for example if they paid you in cash."]],
-  stores: ["Stores", "Every store using OwnPOS. A store appears here the first time it opens the app while online, and its details update whenever it goes online again.", ["Last online tells you when its app last checked in. A store that’s been offline for long won’t get your licenses or updates until it reconnects.", "“License sent, waiting…” means you renewed it but its app hasn’t been online since.", "Renew / extend sends more time. Choose Free days to give extra days at no charge.", "Note is private, only for you."]],
+  stores: ["Stores", "Every store using OwnPOS. A store appears here the first time it opens the app while online, and its details update whenever it goes online again.", ["Last online tells you when its app last checked in. A store that’s been offline for long won’t get your licenses or updates until it reconnects.", "“License sent, waiting…” means you renewed it but its app hasn’t been online since.", "Renew / extend sends more time. Choose Free days to give extra days at no charge.", "Note is private, only for you.", "Reset PIN makes a one-time code for an owner who forgot their owner PIN. Confirm it’s really them first, for example by calling their number."]],
   feedback: ["Feedback", "Ideas, problems and praise sent from inside the app. A copy is also emailed to you.", ["New ones have a blue line. Mark them read once you’ve handled them."]],
   licenses: ["Licenses issued", "Every license you’ve sent, with the amount and GCash reference. This is your sales record for OwnPOS.", ["Everything here is also in your Google Sheet, in the Licenses tab."]],
   issue: ["Renew or extend", "This signs a license with your private key so the store’s app knows it’s really from you.", ["The new time starts from their current end date, or from today if their plan already ended.", "Your key stays in this browser. Tick Remember only on your own phone or laptop.", "Free days add time without a charge, for example to make up for a problem."]]
@@ -206,7 +206,7 @@ function storesView() {
     ${S.map(s => `<tr><td><b>${esc(s.store)}</b><div class="small muted">${esc(s.owner)} · <a href="tel:${esc(s.mobile)}" target="_top">${esc(s.mobile)}</a></div><div class="mono muted">${esc(s.deviceId)}${s.storeType ? " · " + esc(s.storeType) : ""}</div>${s.note ? `<div class="small" style="margin-top:4px">📝 ${esc(s.note)}</div>` : ""}</td>
       <td><span class="chip ${s.key}">${s.label}</span>${s.sent ? `<div class="small muted" style="margin-top:4px">License sent, waiting for the app to go online</div>` : ""}</td>
       <td class="num">${nice(s.end)}</td><td>${ago(s.lastSeen)}</td><td>${esc(s.version)}</td><td class="num">${peso(s.paid)}</td>
-      <td><div class="row" style="justify-content:flex-end;flex-wrap:nowrap"><button class="btn sm" data-note="${esc(s.deviceId)}">Note</button>${remindBtn(s)}<button class="btn sm primary" data-issue="${esc(s.deviceId)}">Renew / extend</button></div></td></tr>`).join("") || `<tr><td colspan="7" class="empty">${q ? "No store matches." : "No stores yet. They appear here when a store opens OwnPOS while online."}</td></tr>`}
+      <td><div class="row" style="justify-content:flex-end;flex-wrap:nowrap"><button class="btn sm" data-note="${esc(s.deviceId)}">Note</button><button class="btn sm" data-pinreset="${esc(s.deviceId)}">Reset PIN</button>${remindBtn(s)}<button class="btn sm primary" data-issue="${esc(s.deviceId)}">Renew / extend</button></div></td></tr>`).join("") || `<tr><td colspan="7" class="empty">${q ? "No store matches." : "No stores yet. They appear here when a store opens OwnPOS while online."}</td></tr>`}
     </tbody></table></div></div>`;
 }
 function paymentsView() {
@@ -274,6 +274,20 @@ async function doIssue() {
   render();
 }
 
+/* ---------- owner PIN reset code ---------- */
+async function pinReset(dev) {
+  const s = D.stores.find(x => x.deviceId === dev);
+  if (!privKey) { openIssue(dev); toast("Load your key first, then tap Reset PIN again"); return; }
+  const body = b64u(enc.encode(JSON.stringify({ type: "pinreset", dev, iat: D.today })));
+  const sig = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, privKey, enc.encode(body));
+  const code = `OWNPOS1.${body}.${b64u(sig)}`;
+  const text = `Hi! Here's your OwnPOS PIN reset code. In OwnPOS tap Owner login → Forgot PIN?, paste this, then create a new PIN. It works for 3 days and only once.\n\n${code}`;
+  $("#mbox").innerHTML = `<div class="mhead"><h2>Reset PIN · ${esc(s.store)}</h2><button class="x" data-close aria-label="Close">×</button></div>
+    <div class="result warn">Only send this after you’ve confirmed you’re talking to the real owner (${esc(s.owner)} · ${esc(s.mobile)}). Anyone with this code can open the owner side.</div>
+    <textarea class="inp mono" rows="6" readonly id="msgtxt">${esc(text)}</textarea><div class="row"><button class="btn" id="copyMsg">Copy message</button><button class="btn primary" data-close>Done</button></div>`;
+  $("#modal").classList.remove("hidden");
+}
+
 /* ---------- events ---------- */
 document.addEventListener("click", async e => {
   const t = e.target.closest("button,[data-close]"); if (!t) { if (e.target.id === "modal") $("#modal").classList.add("hidden"); if (e.target.id === "helpbox") $("#helpbox").classList.add("hidden"); return; }
@@ -283,6 +297,7 @@ document.addEventListener("click", async e => {
     if (t.dataset.tab) { tab = t.dataset.tab; render(); window.scrollTo(0, 0); }
     else if (t.hasAttribute("data-close")) $("#modal").classList.add("hidden");
     else if (t.dataset.issue) openIssue(t.dataset.issue);
+    else if (t.dataset.pinreset) await pinReset(t.dataset.pinreset);
     else if (t.dataset.approve) { const r = D.requests.find(x => x.id === t.dataset.approve); openIssue(r.deviceId, r); }
     else if (t.dataset.reject) { t.disabled = true; D = await run("adminReject", PIN, t.dataset.reject); render(); toast("Request rejected"); }
     else if (t.dataset.read) { t.disabled = true; D = await run("adminMarkRead", PIN, t.dataset.read); render(); }

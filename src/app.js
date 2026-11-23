@@ -118,6 +118,25 @@ function newStore({ name, owner, mobile, type }) {
   };
 }
 
+/* ---------- owner PIN (cashiers can't switch to owner without it) ---------- */
+const pinHash = pin => sha(P.secret + "|owner-pin|" + pin);
+let pinFails = 0, pinLockUntil = 0, pinMode = null, pinThenCashier = false;   // pinMode: unlock | create | change | forgot
+function pinHTML(msg) {
+  const forgot = pinMode === "forgot";
+  const title = { unlock: "Owner login", create: "Create an owner PIN", change: "Change owner PIN", forgot: "Forgot your PIN?" }[pinMode];
+  const help = { unlock: "Enter the owner PIN to manage the menu, prices, sales records and settings.", create: "Cashiers can’t open the owner side without this PIN. Use 4 to 6 digits and don’t share it with staff.", change: "Enter a new PIN of 4 to 6 digits.", forgot: `Message OwnPOS with your Device ID <b class="num">${P.deviceId}</b>. We’ll check it’s you and send a reset code. Paste it here.` }[pinMode];
+  return `<div class="mhead"><h2>${title}</h2><button class="x" data-act="closemodal" aria-label="Close">×</button></div><div class="stack">
+    <p class="muted" style="margin:0">${help}</p>
+    ${forgot ? `<textarea class="inp mono" id="resetIn" placeholder="OWNPOS1.…"></textarea><button class="btn primary lg block" data-act="pinreset">Reset PIN</button>`
+      : `<input class="inp pinbox" id="pinIn" type="password" inputmode="numeric" autocomplete="off" maxlength="6" aria-label="PIN">
+         ${pinMode !== "unlock" ? `<input class="inp pinbox" id="pinIn2" type="password" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="again" aria-label="Repeat PIN">` : ""}
+         <button class="btn primary lg block" data-act="pinok">${pinMode === "unlock" ? "Open owner side" : "Save PIN"}</button>
+         ${pinMode === "unlock" ? `<button class="btn" style="border:0;color:var(--muted);font-weight:600" data-act="pinforgot">Forgot PIN?</button>` : ""}`}
+    ${msg ? `<div class="result bad">${msg}</div>` : ""}</div>`;
+}
+function openPin(mode, msg) { pinMode = mode; openModal(pinHTML(msg)); const i = $("#pinIn") || $("#resetIn"); if (i) setTimeout(() => i.focus(), 50); }
+function toCashier() { if (!P.ownerPin) { pinThenCashier = true; openPin("create"); return; } P.role = "cashier"; cart = []; tab = "sell"; save(true); render(); toast("Cashier mode. Owner PIN needed to switch back."); }
+
 /* ---------- license state ---------- */
 let LIC = null;
 async function refreshLicense() { LIC = P.license ? await verifyLicense(P.license) : null; if (LIC && LIC.dev !== P.deviceId) LIC = null; }
@@ -197,7 +216,9 @@ const HELP = {
   backup: ["Back up your data", "Your data lives only on this device. If it’s lost, broken or reset, your records go with it, unless you have a backup.", ["Save a backup makes one file with all your sales, menu and brand. Save it to Google Drive or email it to yourself.", "Restore from backup puts that file’s data on this device, for example on a new tablet. It replaces what’s there now."]],
   feedback: ["Feedback", "Send ideas, problems or praise to the OwnPOS team.", ["If you’re offline, it’s saved and sent automatically when the internet comes back.", "Add your email if you’d like a reply."]],
   about: ["About this device", "Your store’s OwnPOS details. If you contact OwnPOS for help, they may ask for your Device ID."],
-  role: ["Owner or Cashier", "Cashier mode shows only Sell and Sales, so staff can’t change prices, the menu or your plan."]
+  role: ["Owner or Cashier", "Cashier mode is for your staff. They can sell and see today’s receipts, but can’t change prices, the menu, your brand, settings or old sales records.", ["Switch to cashier before handing the tablet to staff.", "To come back, tap Owner login and enter your owner PIN.", "If you forget your PIN, tap Forgot PIN? and message OwnPOS for a reset code."]],
+  ownerpin: ["Owner PIN", "A 4 to 6 digit code that keeps the owner side locked when you’re not around.", ["Without it, cashiers can’t change prices, delete items, see past sales or export your records.", "Don’t use your birthday or 1234. Don’t write it on the tablet.", "After 5 wrong tries, OwnPOS waits a minute before letting anyone try again."]],
+  payqr: ["Payment QR codes", "Your GCash and Maya QR codes, shown on the payment screen so customers can scan and pay.", ["In GCash: tap QR → Receive (or Generate QR), then take a screenshot. In Maya: tap Receive money or your QR, then take a screenshot.", "Upload the screenshot here. Crop it close to the QR code if you can.", "A QR Ph code from either app can be scanned by most bank and e-wallet apps.", "Always check the money arrived in your app before completing the sale."]]
 };
 const hb = k => `<button class="help" data-act="help" data-v="${k}" aria-label="What is this?">?</button>`;
 /* ---------- UI helpers ---------- */
@@ -215,8 +236,8 @@ function drawQRs(root) {
     catch (e) { el.textContent = "QR unavailable"; }
   });
 }
-function readImage(file, max) {
-  return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => { const img = new Image(); img.onload = () => { const s = Math.min(1, max / Math.max(img.width, img.height)); const c = document.createElement("canvas"); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s); c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); res(c.toDataURL("image/jpeg", .85)); }; img.onerror = rej; img.src = fr.result; }; fr.onerror = rej; fr.readAsDataURL(file); });
+function readImage(file, max, png) {
+  return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => { const img = new Image(); img.onload = () => { const s = Math.min(1, max / Math.max(img.width, img.height)); const c = document.createElement("canvas"); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s); const g = c.getContext("2d"); if (png) { g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.imageSmoothingEnabled = s < 1; } g.drawImage(img, 0, 0, c.width, c.height); res(png ? c.toDataURL("image/png") : c.toDataURL("image/jpeg", .85)); }; img.onerror = rej; img.src = fr.result; }; fr.onerror = rej; fr.readAsDataURL(file); });
 }
 async function shareText(title, text) {
   const sh = plug("Share");
@@ -256,7 +277,7 @@ async function checkin() {
     const j = await api({ action: "checkin", store: P.brand.name, owner: P.owner.name, mobile: P.owner.mobile, storeType: P.storeType || "", version: CFG.version, plan: st.plan, start: iso(st.start), exp: iso(st.exp), device: deviceInfo });
     if (j && j.license && j.license !== P.license) {
       const pl = await verifyLicense(j.license), cur = LIC ? fromIso(LIC.exp) : P.trial.exp;
-      if (pl && pl.dev === P.deviceId && fromIso(pl.exp) > cur) {
+      if (pl && !pl.type && pl.exp && pl.dev === P.deviceId && fromIso(pl.exp) > cur) {
         P.license = j.license; P.lastRequest = null; await refreshLicense(); save(true); render();
         openModal(`<div class="mhead"><h2>OwnPOS renewed</h2><button class="x" data-act="closemodal" aria-label="Close">×</button></div><p>Salamat! Your payment was confirmed. OwnPOS is active until <b>${fmtDayLong(fromIso(pl.exp))}</b>.</p><button class="btn primary block" data-act="closemodal">OK</button>`);
         checking = false; return checkin();
@@ -290,10 +311,10 @@ function render() {
       <nav class="nav" aria-label="Main">${tabs.map(([k, l]) => `<button data-act="tab" data-v="${k}" ${tab === k ? 'aria-current="page"' : ""}>${icon(k)}${l}</button>`).join("")}</nav>
       <div class="grow"></div>
       ${owner ? `<button class="plancard" data-act="tab" data-v="sub"><b class="small">${st.plan === "Trial" ? "Free trial" : st.plan + " plan"}</b><span class="small muted">${planLine(st)}</span><div class="bar"><i style="width:${(used / total) * 100}%"></i></div></button>` : ""}
-      <div class="role"><label for="roleSel">Signed in as</label><select id="roleSel" data-act-change="role"><option value="owner" ${owner ? "selected" : ""}>Owner</option><option value="cashier" ${!owner ? "selected" : ""}>Cashier</option></select>${hb("role")}</div>
+      <div class="role"><span>${owner ? "Owner" : "Cashier"}</span><button class="btn sm2" data-act="${owner ? "tocashier" : "toowner"}">${owner ? "Switch to cashier" : "Owner login"}</button>${hb("role")}</div>
     </aside>
     <div class="main">
-      <div class="phonehead"><div class="logo">${logo}</div><select class="inp" style="width:auto;min-height:38px;padding:6px 8px;font-size:13px" data-act-change="role" aria-label="Signed in as"><option value="owner" ${owner ? "selected" : ""}>Owner</option><option value="cashier" ${!owner ? "selected" : ""}>Cashier</option></select></div>
+      <div class="phonehead"><div class="logo">${logo}</div><button class="btn sm2" data-act="${owner ? "tocashier" : "toowner"}">${owner ? "Cashier mode" : "Owner login"}</button></div>
       <div class="topbar"><h1>${titles[tab]}</h1>
         ${upd ? `<button class="updpill" data-act="openupdate">Update to ${esc(upd.version)}</button>` : ""}
         ${online ? "" : `<span class="offchip">Offline</span>`}
@@ -330,6 +351,7 @@ function renderSetup() {
       <label class="f" for="s-name">Store name<input class="inp" id="s-name" required placeholder="Kape ni Lito" autocomplete="organization"></label>
       <label class="f" for="s-owner">Your name<input class="inp" id="s-owner" required placeholder="Lito Ramos" autocomplete="name"></label>
       <label class="f" for="s-mobile">Mobile number<input class="inp" id="s-mobile" type="tel" required placeholder="0917 123 4567" autocomplete="tel"></label>
+      <label class="f" for="s-pin">Owner PIN (4 to 6 digits)<input class="inp num" id="s-pin" type="password" inputmode="numeric" maxlength="6" required autocomplete="new-password" placeholder="Only you should know this"></label>
       <div class="f">Type of store<div class="opts">${Object.entries(TEMPLATES).map(([k, t]) => `<button type="button" data-act="setuptype" data-v="${k}" aria-pressed="${setupType === k}">${t.label}</button>`).join("")}</div></div>
       <p class="small muted" style="margin:0">We’ll add a starter menu and colours for this type. You can change everything later.</p>
       <p class="small muted" style="margin:0;background:var(--surface-2);padding:10px 12px;border-radius:12px">Your sales, menu and customers stay on this device. OwnPOS only receives your store name, your name and number, and your plan dates, so we can manage your subscription.</p>
@@ -389,9 +411,14 @@ function payHTML() {
     ${pay.method === "Cash" ? `<label class="f" for="tend">Cash received<input class="inp num" id="tend" inputmode="decimal" value="${esc(pay.tendered)}" data-act-input="tend" placeholder="0.00"></label>
       <div class="quick">${quick.map(v => `<button data-act="tendq" data-v="${v}">${v === t.total ? "Exact" : peso0(v)}</button>`).join("")}</div>
       <div class="row" style="justify-content:space-between"><span class="muted" style="font-weight:700">Change</span><span class="change" id="chg">${tend >= t.total ? peso(tend - t.total) : "—"}</span></div>`
-    : `<label class="f" for="pref">${pay.method} reference no. (optional)<input class="inp num" id="pref" inputmode="numeric" value="${esc(pay.ref)}" data-act-input="pref"></label><p class="small muted" style="margin:0">Check the payment arrived in your ${pay.method} app before you complete the sale.</p>`}
+    : `${payQrHTML(pay.method, t.total)}<label class="f" for="pref">${pay.method} reference no. (optional)<input class="inp num" id="pref" inputmode="numeric" value="${esc(pay.ref)}" data-act-input="pref"></label><p class="small muted" style="margin:0">Check the payment arrived in your ${pay.method} app before you complete the sale.</p>`}
     ${discount === "scpwd" ? `<label class="f" for="scid">Senior / PWD ID no.<input class="inp" id="scid" value="${esc(pay.scId)}" data-act-input="scid" placeholder="Required for the discount"></label>` : ""}
     <button class="btn primary lg block" id="confirmPay" data-act="confirmpay" ${pay.method === "Cash" && tend < t.total ? "disabled" : ""}>Complete sale</button></div>`;
+}
+function payQrHTML(m, total) {
+  const q = (P.payQr || {})[m];
+  if (!q || !q.img) return `<div class="result warn">${P.role === "owner" ? `No ${m} QR code yet. <button class="linkbtn" data-act="gosettings">Add it in Settings</button> so customers can scan to pay.` : `No ${m} QR code yet. Ask the owner to add it in Settings.`}</div>`;
+  return `<div class="payqr"><img src="${q.img}" alt="${esc(m)} QR code"><div><div class="small muted" style="font-weight:700">Scan with ${m} to pay</div><div class="paybig num">${peso(total)}</div>${q.name ? `<div style="font-weight:700">${esc(q.name)}</div>` : ""}${q.number ? `<div class="num muted">${esc(q.number)}</div>` : ""}<button class="btn sm2" style="margin-top:8px" data-act="qrfull" data-v="${m}">Show to customer</button></div></div>`;
 }
 function receiptText(s) { return ascii(`${P.brand.name}\nReceipt #${s.no} · ${fmtDT(s.ts)}${s.orderType ? " · " + s.orderType : ""}${s.customer ? " · " + s.customer : ""}\n${s.items.map(i => `${i.qty} x ${i.name}  ${(i.price * i.qty).toFixed(2)}`).join("\n")}\nTOTAL PHP ${s.total.toFixed(2)} (${s.method})\nVerify: ${s.code}`); }
 function receiptHTML(s, big) {
@@ -427,10 +454,10 @@ function renderSales(st) {
   const counts = {}; todays.forEach(s => s.items.forEach(i => counts[i.name] = (counts[i.name] || 0) + i.qty));
   const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
   const byM = m => todays.filter(s => s.method === m).reduce((a, b) => a + b.total, 0);
-  const list = P.sales.slice().reverse().slice(0, 100);
+  const list = (P.role === "owner" ? P.sales : todays).slice().reverse().slice(0, 100);
   return `<div class="tiles"><div class="tile"><div class="k">Sales today</div><div class="v">${peso0(total)}</div></div><div class="tile"><div class="k">Transactions</div><div class="v">${todays.length}</div></div><div class="tile"><div class="k">Average sale</div><div class="v">${peso0(todays.length ? total / todays.length : 0)}</div></div><div class="tile"><div class="k">Best seller</div><div class="v" style="font-size:17px;padding-top:6px">${top ? esc(top[0]) + ` <span class="muted small">×${top[1]}</span>` : "—"}</div></div></div>
     <div class="grid2" style="grid-template-columns:2fr 1fr">
-      <div class="card"><div class="row" style="justify-content:space-between;margin-bottom:6px"><h2>Receipts ${hb("receipts")}</h2>${P.role === "owner" ? `<button class="btn" style="min-height:36px;padding:6px 12px;font-size:13px" data-act="csv">Export CSV</button>` : ""}</div>
+      <div class="card"><div class="row" style="justify-content:space-between;margin-bottom:6px"><h2>${P.role === "owner" ? "Receipts" : "Today’s receipts"} ${hb("receipts")}</h2>${P.role === "owner" ? `<button class="btn" style="min-height:36px;padding:6px 12px;font-size:13px" data-act="csv">Export CSV</button>` : ""}</div>
         <div class="tablewrap"><table class="t"><thead><tr><th>No.</th><th>Time</th><th>Customer</th><th>Paid by</th><th style="text-align:right">Total</th></tr></thead><tbody>
         ${list.map(s => `<tr data-act="receipt" data-v="${s.no}"><td class="num">#${s.no}</td><td class="num">${fmtDT(s.ts)}</td><td>${esc([s.orderType, s.customer].filter(Boolean).join(" · "))}</td><td>${esc(s.method)}</td><td class="num" style="text-align:right;font-weight:800">${peso(s.total)}</td></tr>`).join("") || `<tr><td colspan="5" class="empty">No sales yet.</td></tr>`}</tbody></table></div></div>
       <div class="stack"><div class="card stack"><h2>Today by payment ${hb("bymethod")}</h2>${["Cash", "GCash", "Maya"].map(m => `<div class="sum"><span>${m}</span><span>${peso(byM(m))}</span></div>`).join("")}</div>
@@ -524,6 +551,7 @@ async function activate(token) {
   const m = token.match(/OWNPOS1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/); if (m) token = m[0]; // accepts the whole message too
   const pl = await verifyLicense(token);
   if (!pl) { subMsg = ["bad", "That license code isn’t valid. It may be incomplete or edited. Ask OwnPOS to send it again."]; render(); return; }
+  if (pl.type || !pl.exp) { subMsg = ["bad", "That code isn’t a license."]; render(); return; }
   if (pl.dev !== P.deviceId) { subMsg = ["bad", `This license is for another device (${esc(pl.dev)}). This device is ${P.deviceId}.`]; render(); return; }
   const cur = LIC ? fromIso(LIC.exp) : P.trial.exp;
   if (fromIso(pl.exp) < cur) { subMsg = ["bad", "This license ends earlier than the one you already have."]; render(); return; }
@@ -533,9 +561,22 @@ async function activate(token) {
 
 /* ---------- settings: updates, feedback, backup ---------- */
 let update = null; // {version, notes, url, page}
+function payQrCard() {
+  const q = P.payQr || {};
+  return `<div class="card stack"><h2>Payment QR codes ${hb("payqr")}</h2><p class="small muted" style="margin:0">Customers paying by GCash or Maya scan this from the payment screen.</p>
+    ${["GCash", "Maya"].map(m => { const x = q[m] || {}; return `<div class="qrset"><div class="qrprev">${x.img ? `<img src="${x.img}" alt="${m} QR">` : `<span class="small muted">No QR</span>`}</div>
+      <div class="stack" style="flex:1;min-width:180px;gap:8px"><b>${m}</b>
+        <input class="inp" data-payqr="${m}" data-k="name" value="${esc(x.name || "")}" placeholder="Account name">
+        <input class="inp num" data-payqr="${m}" data-k="number" value="${esc(x.number || "")}" placeholder="Number (optional)" inputmode="tel">
+        <div class="row"><span class="btn filebtn sm2">${x.img ? "Change QR" : "Upload QR"}<input type="file" accept="image/*" data-act-change="qrimg" data-v="${m}"></span>${x.img ? `<button class="btn sm2 danger" data-act="qrclear" data-v="${m}">Remove</button>` : ""}</div></div></div>`; }).join("")}</div>`;
+}
+function ownerPinCard() {
+  return `<div class="card stack"><h2>Owner PIN ${hb("ownerpin")}</h2><p class="small muted" style="margin:0">${P.ownerPin ? "Cashiers need this PIN to open the owner side." : "Set a PIN so cashiers can’t open the owner side."}</p>
+    <div class="row"><button class="btn primary" data-act="${P.ownerPin ? "pinchange" : "pincreate"}">${P.ownerPin ? "Change PIN" : "Set owner PIN"}</button><button class="btn" data-act="tocashier">Switch to cashier</button></div></div>`;
+}
 function renderSettings() {
   const upd = update;
-  return `<div class="grid2"><div class="stack">
+  return `<div class="grid2"><div class="stack">${payQrCard()}${ownerPinCard()}
       <div class="card stack"><div class="row" style="justify-content:space-between"><h2>Updates ${hb("updates")}</h2>${upd ? `<span class="chip warn">Update ready</span>` : online ? `<span class="chip good">Up to date</span>` : `<span class="chip info">Offline</span>`}</div>
         <dl class="kv"><dt>This device</dt><dd>OwnPOS ${esc(CFG.version)}</dd><dt>Latest</dt><dd>${upd ? "OwnPOS " + esc(upd.version) : online ? "OwnPOS " + esc(CFG.version) : "Unknown while offline"}</dd><dt>Last checked</dt><dd>${P.lastCheck ? fmtDT(P.lastCheck) : "Not yet"}</dd></dl>
         <p class="small muted" style="margin:0">OwnPOS checks when it opens, every 6 hours, and when the internet comes back. Your sales and menu are kept when you update.</p>
@@ -737,7 +778,53 @@ const A = {
   async emailfeedback() { const item = { type: fb.type, msg: fb.msg.trim(), meta: fb.meta ? metaLine() : "" }; await openUrl(gmailLink(item)); },
   async backup() { await shareFile(`ownpos-backup-${P.brand.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-${iso(dayNum(Date.now()))}.json`, JSON.stringify(P), "application/json"); },
   help(el) { const h = HELP[el.dataset.v]; if (!h) return; openModal(`<div class="mhead"><h2>${esc(h[0])}</h2><button class="x" data-act="closemodal" aria-label="Close">×</button></div><div class="stack"><p style="margin:0">${esc(h[1])}</p>${h[2] ? `<ul class="notes">${h[2].map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}<button class="btn primary block" data-act="closemodal">Got it</button></div>`); },
-  closemodal() { closeModal(); }
+  tocashier() { closeModal(); toCashier(); },
+  toowner() { if (!P.ownerPin) { P.role = "owner"; save(true); render(); openPin("create"); return; } openPin("unlock"); },
+  pincreate() { pinThenCashier = false; openPin("create"); },
+  pinchange() { openPin("unlock"); pinMode = "unlock-then-change"; },
+  pinforgot() { openPin("forgot"); },
+  async pinok() {
+    const v = ($("#pinIn").value || "").trim();
+    if (pinMode === "unlock" || pinMode === "unlock-then-change") {
+      if (Date.now() < pinLockUntil) { openPin("unlock", `Too many wrong tries. Wait ${Math.ceil((pinLockUntil - Date.now()) / 1000)} seconds.`); return; }
+      if ((await pinHash(v)) !== P.ownerPin) { pinFails++; if (pinFails >= 5) { pinLockUntil = Date.now() + 60000; pinFails = 0; } const keep = pinMode; openPin("unlock", "Wrong PIN."); pinMode = keep; return; }
+      pinFails = 0;
+      if (pinMode === "unlock-then-change") { openPin("change"); return; }
+      P.role = "owner"; save(true); closeModal(); render(); toast("Owner side open"); return;
+    }
+    const v2 = ($("#pinIn2").value || "").trim();
+    if (!/^\d{4,6}$/.test(v)) { openPin(pinMode, "Use 4 to 6 digits."); return; }
+    if (v !== v2) { openPin(pinMode, "The two PINs don’t match."); return; }
+    const first = !P.ownerPin; P.ownerPin = await pinHash(v); save(true); closeModal(); render();
+    toast(first ? "Owner PIN saved" : "PIN changed");
+    if (pinThenCashier) { pinThenCashier = false; toCashier(); }
+  },
+  async pinreset() {
+    const raw = ($("#resetIn").value || "").trim(), m = raw.match(/OWNPOS1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/);
+    const pl = m ? await verifyLicense(m[0]) : null, today = dayNum(clock().now);
+    P.usedResets = P.usedResets || [];
+    if (!pl || pl.type !== "pinreset" || pl.dev !== P.deviceId) { openPin("forgot", "That reset code isn’t valid for this device."); return; }
+    if (Math.abs(today - fromIso(pl.iat)) > 3) { openPin("forgot", "That reset code has expired. Ask OwnPOS for a new one."); return; }
+    if (P.usedResets.includes(m[0].slice(-20))) { openPin("forgot", "That reset code was already used."); return; }
+    P.usedResets.push(m[0].slice(-20)); P.ownerPin = null; P.role = "owner"; pinThenCashier = false; save(true); render(); openPin("create");
+  },
+  gosettings() { closeModal(); tab = "settings"; render(); },
+  qrclear(el) { if (P.payQr) delete P.payQr[el.dataset.v]; save(); render(); },
+  qrfull(el) {
+    const m = el.dataset.v, q = P.payQr[m], t = cartTotals();
+    const items = cart.map(l => { const p = P.products.find(x => x.id === l.id); return p ? `<div class="pline">${thumb(p, 56)}<div style="flex:1;min-width:0"><div style="font-weight:700">${esc(p.name)}</div><div class="small muted num">${l.qty} × ${peso0(p.price)}</div></div><div class="num" style="font-weight:800">${peso(p.price * l.qty)}</div></div>` : ""; }).join("");
+    openModal(`<div class="mhead"><h2>${esc(P.brand.name)}</h2><button class="x" data-act="qrback" aria-label="Back">×</button></div>
+      <div class="qrcust">
+        <div class="qrorder"><div class="row small" style="justify-content:space-between;font-weight:700"><span>Your order${custName.trim() ? " · " + esc(custName.trim()) : ""}</span><span class="muted">${esc(P.orderType)}</span></div>
+          <div class="qrlines">${items}</div>
+          <div class="sum"><span>Subtotal</span><span>${peso(t.sub)}</span></div>${t.lessVat ? `<div class="sum"><span>Less VAT 12%</span><span>−${peso(t.lessVat)}</span></div>` : ""}${t.disc ? `<div class="sum"><span>Senior/PWD discount</span><span>−${peso(t.disc)}</span></div>` : ""}
+          <div class="sum total"><span>Total to pay</span><span>${peso(t.total)}</span></div></div>
+        <div class="qrfull"><img src="${q.img}" alt="${m} QR code"><div class="paybig num">${peso(t.total)}</div>${q.name ? `<div style="font-weight:700;font-size:18px">${esc(q.name)}</div>` : ""}${q.number ? `<div class="num muted">${esc(q.number)}</div>` : ""}<p class="muted" style="margin:0">Open ${m}, tap <b>Scan QR</b> and scan this code. Enter <b>${peso(t.total)}</b>.</p></div>
+      </div>
+      <button class="btn primary lg block" style="margin-top:14px" data-act="qrback">Payment received · back to sale</button>`, true);
+  },
+  qrback() { openModal(payHTML()); },
+  closemodal() { pinThenCashier = false; closeModal(); }
 };
 function refreshCart() { const cm = $("#cartModal"); if (cm) { if (!cart.length) closeModal(); else cm.innerHTML = cartHTML(status()); } render(); }
 
@@ -750,9 +837,10 @@ document.addEventListener("click", e => {
 document.addEventListener("submit", async e => {
   e.preventDefault();
   if (e.target.id === "setupForm") {
-    const name = $("#s-name").value.trim(), owner = $("#s-owner").value.trim(), mobile = $("#s-mobile").value.trim();
-    if (!name || !owner || !mobile) { toast("Fill in all three fields"); return; }
-    P = newStore({ name, owner, mobile, type: setupType }); await save(true); await refreshLicense(); tab = "sell"; render(); toast("Your store is ready. Free for 30 days."); checkUpdates(); checkin();
+    const name = $("#s-name").value.trim(), owner = $("#s-owner").value.trim(), mobile = $("#s-mobile").value.trim(), pin = $("#s-pin").value.trim();
+    if (!name || !owner || !mobile) { toast("Fill in all the fields"); return; }
+    if (!/^\d{4,6}$/.test(pin)) { toast("The owner PIN must be 4 to 6 digits"); $("#s-pin").focus(); return; }
+    P = newStore({ name, owner, mobile, type: setupType }); P.ownerPin = await pinHash(pin); await save(true); await refreshLicense(); tab = "sell"; render(); toast("Your store is ready. Free for 30 days."); checkUpdates(); checkin();
   }
   if (e.target.id === "prodForm") {
     const id = e.target.dataset.id, name = $("#pname").value.trim(), price = parseFloat($("#pprice").value);
@@ -764,6 +852,7 @@ document.addEventListener("submit", async e => {
 });
 document.addEventListener("input", e => {
   const t = e.target;
+  if (t.dataset.payqr) { P.payQr = P.payQr || {}; P.payQr[t.dataset.payqr] = Object.assign(P.payQr[t.dataset.payqr] || {}, { [t.dataset.k]: t.value.slice(0, 60) }); save(); return; }
   if (t.dataset.brand) { P.brand[t.dataset.brand] = t.value; applyBrand(); const rp = $("#rprev"); if (rp && P.sales.length) { rp.innerHTML = receiptHTML(P.sales[P.sales.length - 1]); drawQRs(rp); } save(); return; }
   const a = t.dataset.actInput;
   if (a === "q") { query = t.value; const pos = t.selectionStart; render(); const q = $("#q"); if (q) { q.focus(); q.setSelectionRange(pos, pos); } }
@@ -778,10 +867,10 @@ document.addEventListener("change", async e => {
   const t = e.target, a = t.dataset.actChange;
   if (t.dataset.brandCheck) { P.brand[t.dataset.brandCheck] = t.checked; save(); render(); return; }
   if (t.dataset.brand) { save(); render(); return; }
-  if (a === "role") { P.role = t.value; cart = []; save(); render(); }
   if (a === "toggleon") { P.products.find(x => x.id === t.dataset.v).on = t.checked; save(); }
   if (a === "fbmeta") { fb.meta = t.checked; openModal(feedbackHTML()); }
   if (a === "logo" && t.files[0]) { try { P.brand.logo = await readImage(t.files[0], 240); save(); render(); } catch (err) { toast("Couldn’t read that image. Try a JPG or PNG."); } }
+  if (a === "qrimg" && t.files[0]) { try { P.payQr = P.payQr || {}; P.payQr[t.dataset.v] = Object.assign(P.payQr[t.dataset.v] || {}, { img: await readImage(t.files[0], 720, true) }); save(); render(); toast(t.dataset.v + " QR saved"); } catch (err) { toast("Couldn’t read that image. Use a screenshot of your QR."); } }
   if (a === "pimg" && t.files[0]) { try { const d = await readImage(t.files[0], 360); $("#pimgData").value = d; $("#pimgPrev").innerHTML = `<img src="${d}" alt="">`; } catch (err) { toast("Couldn’t read that image."); } }
   if (a === "restore" && t.files[0]) {
     try { const data = JSON.parse(await t.files[0].text()); if (!data || !data.deviceId || !data.brand || !Array.isArray(data.sales)) throw 0;
