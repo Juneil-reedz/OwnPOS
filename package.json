@@ -1,0 +1,30 @@
+{
+  "name": "ownpos",
+  "version": "1.0.0",
+  "private": true,
+  "description": "OwnPOS – offline-first point of sale for Filipino food businesses",
+  "scripts": {
+    "prepare-www": "node scripts/prepare-www.mjs",
+    "sync": "npm run prepare-www && npx cap sync android"
+  },
+  "dependencies": {
+    "@capacitor-mlkit/barcode-scanning": "8.2.2",
+    "@capacitor/android": "8.6.2",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/browser": "8.0.5",
+    "@capacitor/core": "8.6.2",
+    "@capacitor/device": "8.0.3",
+    "@capacitor/filesystem": "8.1.5",
+    "@capacitor/network": "8.0.1",
+    "@capacitor/share": "8.0.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.2",
+    "@fontsource/baloo-2": "5.3.0",
+    "@fontsource/bricolage-grotesque": "5.3.0",
+    "@fontsource/figtree": "5.3.0",
+    "@fontsource/fraunces": "5.3.0",
+    "@fontsource/ibm-plex-mono": "5.3.0",
+    "qrcodejs": "1.0.0"
+  }
+}

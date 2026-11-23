@@ -1,0 +1,109 @@
+name: Build Android app
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "New version number, e.g. 1.0.1 (leave empty to only build a test APK)"
+        required: false
+        default: ""
+      notes:
+        description: "What's new. Separate items with ;  e.g. Faster receipts; Fixed the CSV export"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      OWNPOS_VERSION: ${{ github.event.inputs.version }}
+      WEB3FORMS_KEY: ${{ secrets.WEB3FORMS_KEY }}
+      GCASH_NAME: ${{ vars.GCASH_NAME }}
+      GCASH_NUMBER: ${{ vars.GCASH_NUMBER }}
+      RELEASE: ${{ github.event.inputs.version != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Install
+        run: npm ci
+
+      - name: Prepare app files
+        run: |
+          if [ -z "$OWNPOS_VERSION" ]; then export OWNPOS_VERSION="$(node -p "require('./package.json').version")"; fi
+          echo "OWNPOS_VERSION=$OWNPOS_VERSION" >> "$GITHUB_ENV"
+          node scripts/prepare-www.mjs
+          npx cap sync android
+
+      - name: Signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/ownpos.jks"
+            echo "OWNPOS_KEYSTORE=$RUNNER_TEMP/ownpos.jks" >> "$GITHUB_ENV"
+            echo "OWNPOS_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "Signing with the OwnPOS release key."
+          elif [ "$RELEASE" = "true" ]; then
+            echo "::error::Add the ANDROID_KEYSTORE_BASE64 and ANDROID_KEYSTORE_PASSWORD secrets before publishing a release."
+            exit 1
+          else
+            echo "::warning::No signing key secret yet. This test APK uses a temporary key and can't be updated later."
+          fi
+
+      - name: Build APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+          mkdir -p ../dist
+          cp app/build/outputs/apk/release/app-release.apk "../dist/OwnPOS-$OWNPOS_VERSION.apk"
+
+      - name: Upload test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: OwnPOS-${{ env.OWNPOS_VERSION }}
+          path: dist/*.apk
+
+      - name: Release notes
+        if: env.RELEASE == 'true'
+        env:
+          NOTES: ${{ github.event.inputs.notes }}
+        run: |
+          {
+            if [ -n "$NOTES" ]; then echo "$NOTES" | tr ';' '\n' | sed 's/^ *//;s/ *$//' | sed '/^$/d' | sed 's/^/- /'; else echo "- Improvements and fixes"; fi
+            echo ""
+            echo "## Install"
+            echo "Download **OwnPOS-$OWNPOS_VERSION.apk** below on the Android tablet or phone, open it and tap Install. Sales, menu and license are kept when you update."
+          } > dist/notes.md
+          cat dist/notes.md
+
+      - name: Publish release
+        if: env.RELEASE == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.OWNPOS_VERSION }}
+          name: OwnPOS ${{ env.OWNPOS_VERSION }}
+          body_path: dist/notes.md
+          files: dist/OwnPOS-${{ env.OWNPOS_VERSION }}.apk
+          make_latest: true

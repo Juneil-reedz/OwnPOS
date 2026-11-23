@@ -1,0 +1,9 @@
+{
+  "appId": "ph.ownpos.app",
+  "appName": "OwnPOS",
+  "webDir": "www",
+  "android": { "allowMixedContent": false },
+  "plugins": {
+    "CapacitorHttp": { "enabled": true }
+  }
+}

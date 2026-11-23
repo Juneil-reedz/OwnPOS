@@ -1,0 +1,7 @@
+node_modules/
+www/
+dist/
+*.jks
+*.keystore
+*private-key*.json
+.DS_Store
