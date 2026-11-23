@@ -452,7 +452,7 @@ function renderSub(st) {
         <button class="btn own lg" data-act="sendrequest">Send renewal request</button></div>
       <div class="card stack"><h2>Activate a license</h2>
         <button class="btn primary lg" data-act="scanlicense">Scan license QR</button>
-        <label class="f" for="licIn">Or paste the license code<textarea class="inp mono" id="licIn" placeholder="OWNPOS1.…"></textarea></label>
+        <label class="f" for="licIn">Or paste the message or code OwnPOS sent you<textarea class="inp mono" id="licIn" placeholder="OWNPOS1.…"></textarea></label>
         <button class="btn" data-act="activate">Activate code</button>${subMsg ? `<div class="result ${subMsg[0]}">${subMsg[1]}</div>` : ""}</div>
     </div></div>`;
 }
@@ -462,6 +462,7 @@ function requestText() {
 }
 async function activate(token) {
   token = String(token || "").trim();
+  const m = token.match(/OWNPOS1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/); if (m) token = m[0]; // accepts the whole message too
   const pl = await verifyLicense(token);
   if (!pl) { subMsg = ["bad", "That license code isn’t valid. It may be incomplete or edited. Ask OwnPOS to send it again."]; render(); return; }
   if (pl.dev !== P.deviceId) { subMsg = ["bad", `This license is for another device (${esc(pl.dev)}). This device is ${P.deviceId}.`]; render(); return; }
