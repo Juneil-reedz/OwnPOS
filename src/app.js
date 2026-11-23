@@ -18,7 +18,8 @@ const rnd = (n, set = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789") => Array.from(crypto.g
 /* ---------- native bridge ---------- */
 const Cap = window.Capacitor;
 const isNative = !!(Cap && Cap.isNativePlatform && Cap.isNativePlatform());
-const plug = n => (Cap && Cap.Plugins && Cap.Plugins[n]) || null;
+const _plugs = {};
+const plug = n => { if (!Cap) return null; if (Cap.Plugins && Cap.Plugins[n]) return Cap.Plugins[n]; if (isNative && Cap.registerPlugin) return _plugs[n] || (_plugs[n] = Cap.registerPlugin(n)); return null; };
 
 /* ---------- time ---------- */
 const dayNum = t => { const d = new Date(t); return Math.round(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / DAY); };
@@ -137,20 +138,21 @@ function computeTotals(items, discount) {
   else if (P.brand.vat) { vatable = sub / 1.12; vat = sub - vatable; }
   return { sub, lessVat, disc, total: Math.round(total * 100) / 100, vatable, vat };
 }
-async function recordSale({ items, method, tendered, ref, discount, scId, orderType }) {
+async function recordSale({ items, method, tendered, ref, discount, scId, orderType, customer }) {
   const t = computeTotals(items, discount);
   P.seq += 1; const no = String(P.seq).padStart(6, "0"); const time = clock().now;
   const h = await sha([P.deviceId, no, t.total.toFixed(2), time, P.secret].join("|"));
-  const sale = { no, ts: time, items, ...t, discount, scId, method, orderType, tendered: method === "Cash" ? tendered : t.total, change: method === "Cash" ? Math.max(0, tendered - t.total) : 0, ref, cashier: P.role === "owner" ? "Owner" : "Cashier", code: h.slice(0, 4) + "-" + h.slice(4, 8) };
+  const sale = { no, ts: time, items, ...t, discount, scId, method, orderType, customer: customer || "", tendered: method === "Cash" ? tendered : t.total, change: method === "Cash" ? Math.max(0, tendered - t.total) : 0, ref, cashier: P.role === "owner" ? "Owner" : "Cashier", code: h.slice(0, 4) + "-" + h.slice(4, 8) };
   P.sales.push(sale); save(true); return sale;
 }
 
 /* ---------- brand ---------- */
 function inkFor(hex) { const n = parseInt(hex.slice(1), 16), r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255; const L = [r, g, b].map(v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }); return (.2126 * L[0] + .7152 * L[1] + .0722 * L[2]) > .4 ? "#1E1B18" : "#FFFFFF"; }
+function mixWhite(hex, k) { const n = parseInt(hex.slice(1), 16); const c = [n >> 16 & 255, n >> 8 & 255, n & 255].map(v => Math.round(v * k + 255 * (1 - k))); return "#" + c.map(v => v.toString(16).padStart(2, "0")).join(""); }
 function applyBrand() {
   const b = P.brand, r = document.documentElement.style;
   r.setProperty("--brand", b.color); r.setProperty("--brand-ink", inkFor(b.color));
-  r.setProperty("--brand-soft", `color-mix(in srgb, ${b.color} 14%, #fff)`);
+  r.setProperty("--brand-soft", mixWhite(b.color, .14));
   r.setProperty("--font-brand", `"${b.font}", system-ui, sans-serif`);
   r.setProperty("--radius", { round: "18px", soft: "12px", square: "4px" }[b.corners] || "16px");
   r.setProperty("--tile", b.tile === "compact" ? "120px" : "160px");
@@ -176,7 +178,7 @@ const icon = (n, cls = "i") => `<svg class="${cls}" viewBox="0 0 24 24" fill="no
 
 /* ---------- "?" help ---------- */
 const HELP = {
-  order: ["Current order", "Everything the customer is buying right now. Tap an item on the menu to add it, and use − and + to change how many.", ["Dine in, Take out or Delivery is printed on the receipt so your staff know where the order goes.", "Senior / PWD gives the 20% discount required by law. If you’re VAT-registered, VAT is removed first, then 20% is taken off. You’ll be asked for their ID number.", "Charge opens the payment screen: Cash (with change), GCash or Maya."]],
+  order: ["Current order", "Everything the customer is buying right now. Tap an item on the menu to add it, and use − and + to change how many.", ["Dine in, Take out or Delivery is printed on the receipt so your staff know where the order goes.", "Table / name: type the table number or the customer’s name so you can call them when it’s ready. It’s printed on the receipt too.", "Senior / PWD gives the 20% discount required by law. If you’re VAT-registered, VAT is removed first, then 20% is taken off. You’ll be asked for their ID number.", "Charge opens the payment screen: Cash (with change), GCash or Maya."]],
   receipts: ["Receipts", "Every sale made on this device, newest first. Tap one to see or resend its receipt.", ["Export CSV makes a spreadsheet file of all your sales. Use it for your bookkeeping or send it to your accountant.", "Sales are saved only on this device. Back them up in Settings."]],
   bymethod: ["Today by payment", "How much of today’s sales came in as cash, GCash and Maya.", ["At closing, the Cash amount is what should be in your drawer (plus your starting change)."]],
   verify: ["Check a receipt photo", "Each receipt has a number and a verification code made from the sale’s details.", ["If a customer shows you a photo of a receipt, type its number and code here.", "“Genuine” means this POS really made that receipt for that amount. “No match” means it was edited or isn’t from your store."]],
@@ -191,7 +193,7 @@ const HELP = {
   timeline: ["What happens next", "The dates of your reminders and of the end of your plan.", ["You’ll see a banner on these days. No internet needed."]],
   renew: ["Renew OwnPOS", "How to pay for your next month, 3 months or year.", ["1. Pick a plan and send the amount by GCash to the name and number shown.", "2. Type the GCash reference number from your receipt and tap Send renewal request.", "3. Once OwnPOS sees your payment, your new end date arrives on this device by itself when it’s online. Paying for longer saves money: 12 months is ₱5,000 instead of ₱6,000."]],
   activate: ["Activate a license", "Use this only if OwnPOS sent you a license code by message, for example if this device was offline for a long time.", ["Scan license QR opens the camera. Point it at the QR code OwnPOS shows you.", "Or paste the whole message OwnPOS sent and tap Activate code."]],
-  updates: ["Updates", "New versions of OwnPOS with fixes and new features.", ["When one is ready, a yellow “Update to…” button appears at the top.", "Updating keeps your sales, menu, brand and license.", "Updates never interrupt a sale. Finish the current order first."]],
+  updates: ["Updates", "New versions of OwnPOS with fixes and new features.", ["When one is ready, an update window opens and a yellow “Update to…” button appears at the top.", "Tap Update now. It downloads inside OwnPOS, then Android asks you to confirm. Tap Update, then Open.", "The first time, Android asks you to allow OwnPOS to install updates. Turn it on once.", "Updating keeps your sales, menu, brand and license.", "Updates never interrupt a sale. Finish the current order first."]],
   backup: ["Back up your data", "Your data lives only on this device. If it’s lost, broken or reset, your records go with it, unless you have a backup.", ["Save a backup makes one file with all your sales, menu and brand. Save it to Google Drive or email it to yourself.", "Restore from backup puts that file’s data on this device, for example on a new tablet. It replaces what’s there now."]],
   feedback: ["Feedback", "Send ideas, problems or praise to the OwnPOS team.", ["If you’re offline, it’s saved and sent automatically when the internet comes back.", "Add your email if you’d like a reply."]],
   about: ["About this device", "Your store’s OwnPOS details. If you contact OwnPOS for help, they may ask for your Device ID."],
@@ -268,7 +270,7 @@ async function checkin() {
 /* =========================================================
    RENDER
    ========================================================= */
-let tab = "sell", cart = [], activeCat = null, query = "", discount = "none", pay = null, subMsg = null, setupType = "carinderia";
+let custName = "", tab = "sell", cart = [], activeCat = null, query = "", discount = "none", pay = null, subMsg = null, setupType = "carinderia";
 
 function render() {
   const app = $("#app");
@@ -278,7 +280,7 @@ function render() {
   const tabs = owner ? [["sell", "Sell"], ["sales", "Sales"], ["menu", "Menu"], ["brand", "Brand"], ["sub", "Subscription"], ["settings", "Settings"]] : [["sell", "Sell"], ["sales", "Sales"]];
   if (!tabs.some(t => t[0] === tab)) tab = "sell";
   const titles = { sell: "Sell", sales: "Sales", menu: "Menu", brand: "Make it yours", sub: "Subscription", settings: "Settings" };
-  const b = P.brand, upd = owner && update ? update : null;
+  const b = P.brand, upd = update;
   const logo = `${b.logo ? `<img src="${b.logo}" alt="">` : `<div class="ph">${esc(initials(b.name) || "S")}</div>`}<div class="name">${esc(b.name)}</div>`;
   const body = { sell: renderSell, sales: renderSales, menu: renderMenu, brand: renderBrand, sub: renderSub, settings: renderSettings }[tab](st);
   const total = Math.max(1, st.exp - st.start), used = Math.min(total, Math.max(0, st.today - st.start));
@@ -339,6 +341,8 @@ function renderSetup() {
 
 /* ---------- sell ---------- */
 const cartItems = () => cart.map(l => { const p = P.products.find(x => x.id === l.id); return p ? { name: p.name, price: p.price, qty: l.qty } : null; }).filter(Boolean);
+const thumb = (p, size) => `<div class="cthumb" style="width:${size}px;height:${size}px;${p && p.img ? `background-image:url(${p.img})` : `background:${catColor(p ? p.cat : "")}`}">${p && p.img ? "" : esc(initials(p ? p.name : "?"))}</div>`;
+const custPlaceholder = t => t === "Dine in" ? "Table no. or customer name" : t === "Take out" ? "Customer name" : "Name, number and address";
 const cartTotals = () => computeTotals(cartItems(), discount);
 function renderSell(st) {
   if (activeCat && !P.categories.includes(activeCat)) activeCat = null;
@@ -360,11 +364,12 @@ function renderSell(st) {
 }
 function cartHTML(st) {
   const t = cartTotals();
-  const lines = cart.map(l => { const p = P.products.find(x => x.id === l.id); if (!p) return ""; return `<div class="line"><div class="ln">${esc(p.name)}<div class="muted small num">${peso0(p.price)} each</div></div>
+  const lines = cart.map(l => { const p = P.products.find(x => x.id === l.id); if (!p) return ""; return `<div class="line">${thumb(p, 44)}<div class="ln">${esc(p.name)}<div class="muted small num">${peso0(p.price)} each</div></div>
     <div class="qty"><button data-act="dec" data-v="${l.id}" aria-label="One less">−</button><span>${l.qty}</span><button data-act="inc" data-v="${l.id}" aria-label="One more">+</button></div>
     <div class="num" style="font-weight:800;min-width:72px;text-align:right">${peso(p.price * l.qty)}</div></div>`; }).join("");
   return `<div class="row" style="justify-content:space-between"><h2>Current order ${hb("order")}</h2>${cart.length ? `<button class="btn" style="min-height:36px;padding:6px 12px;font-size:13px" data-act="clearcart">Clear</button>` : ""}</div>
     <div class="otype" role="group" aria-label="Order type" style="margin-top:12px">${[["Dine in", "dine"], ["Take out", "take"], ["Delivery", "deliv"]].map(([l, i]) => `<button data-act="otype" data-v="${l}" aria-pressed="${P.orderType === l}">${icon(i)}${l}</button>`).join("")}</div>
+    <label class="f" for="cust" style="margin-top:10px"><span>${P.orderType === "Dine in" ? "Table / name" : P.orderType === "Take out" ? "Customer" : "Deliver to"} <span style="font-weight:600">(optional)</span></span><input class="inp" id="cust" data-act-input="cust" value="${esc(custName)}" placeholder="${custPlaceholder(P.orderType)}" autocomplete="off"></label>
     ${cart.length ? `<div class="lines">${lines}</div>
     <div class="row" style="gap:8px;margin:4px 0 8px"><span class="small muted" style="font-weight:700">Discount</span><div class="opts"><button data-act="disc" data-v="none" aria-pressed="${discount === "none"}">None</button><button data-act="disc" data-v="scpwd" aria-pressed="${discount === "scpwd"}">Senior / PWD 20%</button></div></div>
     <div class="sum"><span>Subtotal</span><span>${peso(t.sub)}</span></div>
@@ -377,7 +382,9 @@ function cartHTML(st) {
 function payHTML() {
   const t = cartTotals(), tend = +pay.tendered || 0;
   const quick = [...new Set([t.total, Math.ceil(t.total / 50) * 50, Math.ceil(t.total / 100) * 100, 500, 1000].filter(v => v >= t.total))].slice(0, 5);
+  const sumLines = cart.map(l => { const p = P.products.find(x => x.id === l.id); return p ? `<div class="pline">${thumb(p, 52)}<div style="flex:1;min-width:0"><div style="font-weight:700">${esc(p.name)}</div><div class="small muted num">${l.qty} × ${peso0(p.price)}</div></div><div class="num" style="font-weight:800">${peso(p.price * l.qty)}</div></div>` : ""; }).join("");
   return `<div class="mhead"><h2>Payment · ${peso(t.total)}</h2><button class="x" data-act="closemodal" aria-label="Close">×</button></div><div class="stack">
+    <div class="psum"><div class="row small" style="justify-content:space-between;font-weight:700"><span>${esc(P.orderType)}${custName.trim() ? " · " + esc(custName.trim()) : ""}</span><span class="muted">${cart.reduce((a, b) => a + b.qty, 0)} items</span></div>${sumLines}</div>
     <div class="methods" role="group" aria-label="Payment method">${["Cash", "GCash", "Maya"].map(m => `<button data-act="method" data-v="${m}" aria-pressed="${pay.method === m}">${m}</button>`).join("")}</div>
     ${pay.method === "Cash" ? `<label class="f" for="tend">Cash received<input class="inp num" id="tend" inputmode="decimal" value="${esc(pay.tendered)}" data-act-input="tend" placeholder="0.00"></label>
       <div class="quick">${quick.map(v => `<button data-act="tendq" data-v="${v}">${v === t.total ? "Exact" : peso0(v)}</button>`).join("")}</div>
@@ -386,13 +393,13 @@ function payHTML() {
     ${discount === "scpwd" ? `<label class="f" for="scid">Senior / PWD ID no.<input class="inp" id="scid" value="${esc(pay.scId)}" data-act-input="scid" placeholder="Required for the discount"></label>` : ""}
     <button class="btn primary lg block" id="confirmPay" data-act="confirmpay" ${pay.method === "Cash" && tend < t.total ? "disabled" : ""}>Complete sale</button></div>`;
 }
-function receiptText(s) { return ascii(`${P.brand.name}\nReceipt #${s.no} · ${fmtDT(s.ts)}${s.orderType ? " · " + s.orderType : ""}\n${s.items.map(i => `${i.qty} x ${i.name}  ${(i.price * i.qty).toFixed(2)}`).join("\n")}\nTOTAL PHP ${s.total.toFixed(2)} (${s.method})\nVerify: ${s.code}`); }
+function receiptText(s) { return ascii(`${P.brand.name}\nReceipt #${s.no} · ${fmtDT(s.ts)}${s.orderType ? " · " + s.orderType : ""}${s.customer ? " · " + s.customer : ""}\n${s.items.map(i => `${i.qty} x ${i.name}  ${(i.price * i.qty).toFixed(2)}`).join("\n")}\nTOTAL PHP ${s.total.toFixed(2)} (${s.method})\nVerify: ${s.code}`); }
 function receiptHTML(s, big) {
   const b = P.brand;
   const qrText = `OWNPOS RECEIPT\n${b.name}\nNo. ${s.no}\n${new Date(s.ts).toISOString().slice(0, 16).replace("T", " ")}\nTotal PHP ${s.total.toFixed(2)}\nVerify ${s.code}`;
   return `<div class="paper" style="--paper-brand:${b.color}">
     <div class="rh">${b.receiptLogo && b.logo ? `<img src="${b.logo}" alt="">` : ""}<div class="rn">${esc(b.name)}</div>${b.address ? `<div>${esc(b.address)}</div>` : ""}${b.tin ? `<div>TIN ${esc(b.tin)}</div>` : ""}</div>
-    <hr><div class="r"><span>Receipt</span><span>#${s.no}</span></div><div class="r"><span>${fmtDT(s.ts)}</span><span>${esc(s.cashier)}</span></div>${s.orderType ? `<div class="r"><span>${esc(s.orderType)}</span><span></span></div>` : ""}<hr>
+    <hr><div class="r"><span>Receipt</span><span>#${s.no}</span></div><div class="r"><span>${fmtDT(s.ts)}</span><span>${esc(s.cashier)}</span></div>${s.orderType ? `<div class="r"><span>${esc(s.orderType)}</span><span>${esc(s.customer || "")}</span></div>` : ""}<hr>
     ${s.items.map(i => `<div class="r"><span>${i.qty} × ${esc(i.name)}</span><span>${(i.price * i.qty).toFixed(2)}</span></div>`).join("")}
     <hr><div class="r"><span>Subtotal</span><span>${s.sub.toFixed(2)}</span></div>
     ${s.lessVat ? `<div class="r"><span>Less VAT 12%</span><span>-${s.lessVat.toFixed(2)}</span></div>` : ""}${s.disc ? `<div class="r"><span>Less SC/PWD 20%</span><span>-${s.disc.toFixed(2)}</span></div>` : ""}
@@ -424,8 +431,8 @@ function renderSales(st) {
   return `<div class="tiles"><div class="tile"><div class="k">Sales today</div><div class="v">${peso0(total)}</div></div><div class="tile"><div class="k">Transactions</div><div class="v">${todays.length}</div></div><div class="tile"><div class="k">Average sale</div><div class="v">${peso0(todays.length ? total / todays.length : 0)}</div></div><div class="tile"><div class="k">Best seller</div><div class="v" style="font-size:17px;padding-top:6px">${top ? esc(top[0]) + ` <span class="muted small">×${top[1]}</span>` : "—"}</div></div></div>
     <div class="grid2" style="grid-template-columns:2fr 1fr">
       <div class="card"><div class="row" style="justify-content:space-between;margin-bottom:6px"><h2>Receipts ${hb("receipts")}</h2>${P.role === "owner" ? `<button class="btn" style="min-height:36px;padding:6px 12px;font-size:13px" data-act="csv">Export CSV</button>` : ""}</div>
-        <div class="tablewrap"><table class="t"><thead><tr><th>No.</th><th>Time</th><th>Paid by</th><th style="text-align:right">Total</th></tr></thead><tbody>
-        ${list.map(s => `<tr data-act="receipt" data-v="${s.no}"><td class="num">#${s.no}</td><td class="num">${fmtDT(s.ts)}</td><td>${esc(s.method)}</td><td class="num" style="text-align:right;font-weight:800">${peso(s.total)}</td></tr>`).join("") || `<tr><td colspan="4" class="empty">No sales yet.</td></tr>`}</tbody></table></div></div>
+        <div class="tablewrap"><table class="t"><thead><tr><th>No.</th><th>Time</th><th>Customer</th><th>Paid by</th><th style="text-align:right">Total</th></tr></thead><tbody>
+        ${list.map(s => `<tr data-act="receipt" data-v="${s.no}"><td class="num">#${s.no}</td><td class="num">${fmtDT(s.ts)}</td><td>${esc([s.orderType, s.customer].filter(Boolean).join(" · "))}</td><td>${esc(s.method)}</td><td class="num" style="text-align:right;font-weight:800">${peso(s.total)}</td></tr>`).join("") || `<tr><td colspan="5" class="empty">No sales yet.</td></tr>`}</tbody></table></div></div>
       <div class="stack"><div class="card stack"><h2>Today by payment ${hb("bymethod")}</h2>${["Cash", "GCash", "Maya"].map(m => `<div class="sum"><span>${m}</span><span>${peso(byM(m))}</span></div>`).join("")}</div>
         <div class="card stack"><h2>Check a receipt photo ${hb("verify")}</h2><p class="small muted" style="margin:0">Type the receipt number and verification code from a customer’s photo to confirm it’s real.</p>
           <label class="f" for="vno">Receipt no.<input class="inp num" id="vno" inputmode="numeric" placeholder="000003"></label><label class="f" for="vcode">Verification code<input class="inp num" id="vcode" placeholder="7F3A-91C2"></label>
@@ -554,16 +561,64 @@ async function checkUpdates(manual) {
     update = v && vcmp(v, CFG.version) > 0 && apk ? { version: v, url: apk.browser_download_url, page: j.html_url, notes: String(j.body || "").split(/\r?\n/).map(l => l.replace(/^[-*]\s*/, "").trim()).filter(l => l && !/^#/.test(l)).slice(0, 8) } : null;
     render();
     if (manual && $("#chkres")) $("#chkres").innerHTML = update ? "" : `<div class="result good">You have the latest version, OwnPOS ${esc(CFG.version)}.</div>`;
+    if (update && P.updatePrompted !== update.version && !cart.length && !modalOpen()) { P.updatePrompted = update.version; save(); A.openupdate(); }
   } catch (e) { if (manual && $("#chkres")) $("#chkres").innerHTML = `<div class="result bad">Couldn’t check right now. Try again in a while.</div>`; }
 }
 const vparts = v => String(v).split(".").map(n => parseInt(n, 10) || 0);
 const vcmp = (a, b) => { const x = vparts(a), y = vparts(b); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0); } return 0; };
+/* in-app update: download with progress, then Android's installer */
+let U = { phase: "ready" };          // ready | downloading | permission | installing | error
+const mb = n => (n / 1048576).toFixed(1);
 function updateHTML(u) {
-  return `<div class="mhead"><h2>OwnPOS ${esc(u.version)} is ready</h2><button class="x" data-act="closemodal" aria-label="Close">×</button></div><div class="stack">
-    <p class="muted" style="margin:0">You have ${esc(CFG.version)}. What’s new:</p>${u.notes.length ? `<ul class="notes">${u.notes.map(n => `<li>${esc(n)}</li>`).join("")}</ul>` : ""}
-    <ol class="steps small"><li>Tap <b>Download update</b>. The file downloads in your browser.</li><li>Open it and tap <b>Update</b>. If Android asks, allow installing from your browser.</li><li>Your sales, menu and license are kept.</li></ol>
+  const head = `<div class="mhead"><h2>${U.phase === "installing" ? "Almost done" : `OwnPOS ${esc(u.version)} is ready`}</h2>${U.phase === "downloading" ? "" : `<button class="x" data-act="closemodal" aria-label="Close">×</button>`}</div>`;
+  const icon = `<div class="updicon"><svg viewBox="0 0 64 64" width="56" height="56"><rect width="64" height="64" rx="16" fill="#2343D9"/><path d="M20 14H44V46L40 43L36 46L32 43L28 46L24 43L20 46Z" fill="#fff"/><rect x="25" y="21" width="14" height="3" rx="1.5" fill="#2343D9"/><rect x="25" y="28" width="10" height="3" rx="1.5" fill="#2343D9"/><circle cx="45" cy="45" r="9" fill="#FFB627"/><path d="M41 45L44 48L49 42" stroke="#14171C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg><div><b>OwnPOS ${esc(u.version)}</b><div class="small muted">You have ${esc(CFG.version)}</div></div></div>`;
+  if (U.phase === "downloading") return head + `<div class="stack">${icon}
+      <div class="updbar"><i id="updfill" style="width:${Math.max(2, U.pct || 0)}%"></i></div>
+      <div class="row small" style="justify-content:space-between;font-weight:700"><span id="updpct">${U.pct >= 0 ? U.pct + "%" : "Downloading…"}</span><span class="muted num" id="updmb">${U.total > 0 ? `${mb(U.done || 0)} of ${mb(U.total)} MB` : ""}</span></div>
+      <p class="small muted" style="margin:0">Downloading the update. You can keep this screen open. It takes about a minute on mobile data.</p>
+      <button class="btn" data-act="cancelupdate">Cancel</button></div>`;
+  if (U.phase === "permission") return head + `<div class="stack">${icon}
+      <div class="result warn">One-time step: allow OwnPOS to install its updates.</div>
+      <ol class="steps small"><li>Tap <b>Open setting</b>.</li><li>Turn on <b>Allow from this source</b>.</li><li>Press back. The update continues by itself.</li></ol>
+      <button class="btn primary lg block" data-act="installsettings">Open setting</button></div>`;
+  if (U.phase === "installing") return head + `<div class="stack">${icon}
+      <p style="margin:0">Android will ask <b>“Do you want to update this app?”</b>. Tap <b>Update</b>.</p>
+      <p class="small muted" style="margin:0">When it says the app is installed, tap <b>Open</b>. Your sales, menu and license are kept.</p>
+      <button class="btn" data-act="installnow">Show the installer again</button></div>`;
+  return head + `<div class="stack">${icon}
+    ${U.phase === "error" ? `<div class="result bad">${esc(U.err || "The update didn’t download.")} Check the internet and try again.</div>` : ""}
+    ${u.notes.length ? `<div class="small" style="font-weight:700">What’s new</div><ul class="notes">${u.notes.map(n => `<li>${esc(n)}</li>`).join("")}</ul>` : ""}
     ${cart.length ? `<div class="result warn">Finish the current order first. Updates never interrupt a sale.</div>` : ""}
-    <div class="row"><button class="btn primary" style="flex:1" data-act="downloadupdate" ${cart.length ? "disabled" : ""}>Download update</button><button class="btn" data-act="closemodal">Later</button></div></div>`;
+    <div class="row"><button class="btn primary lg" style="flex:1" data-act="downloadupdate" ${cart.length ? "disabled" : ""}>${U.phase === "error" ? "Try again" : "Update now"}</button><button class="btn lg" data-act="closemodal">Later</button></div>
+    ${U.phase === "error" ? `<button class="btn" style="border:0;color:var(--muted);font-weight:600" data-act="browserupdate">Download in the browser instead</button>` : ""}</div>`;
+}
+function drawUpdate() { if (update) { $("#mbox").className = "box"; $("#mbox").innerHTML = updateHTML(update); $("#modal").classList.remove("hidden"); } }
+let progressHandle = null;
+async function startUpdate() {
+  const au = plug("ApkUpdater");
+  if (!isNative || !au) { await openUrl(update.url); closeModal(); return; }   // older builds / browser
+  U = { phase: "downloading", pct: 0, done: 0, total: 0 }; drawUpdate();
+  try {
+    if (!progressHandle) progressHandle = await au.addListener("progress", ev => {
+      U.pct = ev.percent; U.done = ev.done; U.total = ev.total;
+      const f = $("#updfill"), p = $("#updpct"), m = $("#updmb");
+      if (f) f.style.width = Math.max(2, ev.percent || 0) + "%"; if (p) p.textContent = ev.percent >= 0 ? ev.percent + "%" : "Downloading…"; if (m && ev.total > 0) m.textContent = `${mb(ev.done)} of ${mb(ev.total)} MB`;
+    });
+    const r = await au.download({ url: update.url, fileName: `OwnPOS-${update.version}.apk` });
+    U.path = r.path; save(true);
+    await installUpdate();
+  } catch (e) {
+    const msg = String((e && e.message) || e);
+    U = /cancel/i.test(msg) ? { phase: "ready" } : { phase: "error", err: msg };
+    if (modalOpen()) drawUpdate();
+  }
+}
+async function installUpdate() {
+  const au = plug("ApkUpdater"); if (!au || !U.path) return;
+  const { allowed } = await au.canInstall();
+  if (!allowed) { U.phase = "permission"; drawUpdate(); return; }
+  U.phase = "installing"; drawUpdate();
+  try { await au.install({ path: U.path }); } catch (e) { U = { phase: "error", err: String((e && e.message) || e) }; drawUpdate(); }
 }
 let fb = null;
 const metaLine = () => `OwnPOS ${CFG.version} · ${P.deviceId} · ${deviceInfo}`;
@@ -605,7 +660,7 @@ const A = {
   add(el) { const l = cart.find(x => x.id === el.dataset.v); l ? l.qty++ : cart.push({ id: el.dataset.v, qty: 1 }); render(); },
   inc(el) { cart.find(x => x.id === el.dataset.v).qty++; refreshCart(); },
   dec(el) { const l = cart.find(x => x.id === el.dataset.v); l.qty--; if (l.qty <= 0) cart = cart.filter(x => x !== l); refreshCart(); },
-  clearcart() { cart = []; discount = "none"; refreshCart(); },
+  clearcart() { cart = []; discount = "none"; custName = ""; refreshCart(); },
   disc(el) { discount = el.dataset.v; refreshCart(); },
   otype(el) { P.orderType = el.dataset.v; save(); refreshCart(); },
   opencart() { openModal(`<div class="mhead"><span></span><button class="x" data-act="closemodal" aria-label="Close">×</button></div><div id="cartModal">${cartHTML(status())}</div>`); },
@@ -615,13 +670,13 @@ const A = {
   async confirmpay() {
     const t = cartTotals();
     if (discount === "scpwd" && !pay.scId.trim()) { toast("Enter the Senior / PWD ID number"); return; }
-    const s = await recordSale({ items: cartItems(), method: pay.method, tendered: +pay.tendered || t.total, ref: pay.ref, discount, scId: pay.scId, orderType: P.orderType });
-    cart = []; discount = "none"; render(); openReceipt(s.no, true);
+    const s = await recordSale({ items: cartItems(), method: pay.method, tendered: +pay.tendered || t.total, ref: pay.ref, discount, scId: pay.scId, orderType: P.orderType, customer: custName.trim() });
+    cart = []; discount = "none"; custName = ""; render(); openReceipt(s.no, true);
   },
   receipt(el) { openReceipt(el.dataset.v); },
   showcust(el) { const s = P.sales.find(x => x.no === el.dataset.v); openModal(`<div class="mhead"><h2>Your receipt</h2><button class="x" data-act="closemodal" aria-label="Close">×</button></div><div class="showcust">${receiptHTML(s, true)}</div><p class="small muted" style="text-align:center">Take a photo, or scan the QR code with your phone camera.</p>`, true); },
   sharereceipt(el) { const s = P.sales.find(x => x.no === el.dataset.v); shareText("Receipt #" + s.no, receiptText(s)); },
-  async csv() { const rows = [["receipt_no", "date_time", "order_type", "items", "subtotal", "discount", "total", "method", "reference"]].concat(P.sales.map(s => [s.no, new Date(s.ts).toISOString(), s.orderType || "", s.items.map(i => `${i.qty}x ${i.name}`).join("; "), s.sub.toFixed(2), (s.disc + s.lessVat).toFixed(2), s.total.toFixed(2), s.method, s.ref])); await shareFile(`ownpos-sales-${iso(dayNum(Date.now()))}.csv`, rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n"), "text/csv"); },
+  async csv() { const rows = [["receipt_no", "date_time", "order_type", "customer", "items", "subtotal", "discount", "total", "method", "reference"]].concat(P.sales.map(s => [s.no, new Date(s.ts).toISOString(), s.orderType || "", s.customer || "", s.items.map(i => `${i.qty}x ${i.name}`).join("; "), s.sub.toFixed(2), (s.disc + s.lessVat).toFixed(2), s.total.toFixed(2), s.method, s.ref])); await shareFile(`ownpos-sales-${iso(dayNum(Date.now()))}.csv`, rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n"), "text/csv"); },
   verify() { const no = ($("#vno").value || "").trim().padStart(6, "0"), code = ($("#vcode").value || "").trim().toUpperCase().replace(/[^A-F0-9]/g, ""); const s = P.sales.find(x => x.no === no); $("#vres").innerHTML = s && s.code.replace("-", "") === code ? `<div class="result good">Genuine. #${s.no} · ${fmtDT(s.ts)} · ${peso(s.total)}</div>` : `<div class="result bad">No match. This number and code weren’t issued by this POS, or the photo was edited.</div>`; },
   editprod(el) { prodModal(el.dataset.v); },
   delprod(el) { P.products = P.products.filter(p => p.id !== el.dataset.v); cart = cart.filter(l => l.id !== el.dataset.v); save(); closeModal(); render(); toast("Item deleted"); },
@@ -661,8 +716,12 @@ const A = {
   },
   async activate() { await activate($("#licIn").value); },
   async checkupdate() { await checkUpdates(true); },
-  openupdate() { if (update) openModal(updateHTML(update)); },
-  async downloadupdate() { if (update) { await openUrl(update.url); closeModal(); } },
+  openupdate() { if (!update) return; if (U.phase === "error" || U.phase === "installing" && !U.path) U = { phase: "ready" }; drawUpdate(); },
+  async downloadupdate() { if (update && !cart.length) await startUpdate(); },
+  async cancelupdate() { const au = plug("ApkUpdater"); if (au) { try { await au.cancel(); } catch (e) {} } U = { phase: "ready" }; drawUpdate(); },
+  async installsettings() { const au = plug("ApkUpdater"); if (au) await au.openInstallSettings(); },
+  async installnow() { await installUpdate(); },
+  async browserupdate() { if (update) { await openUrl(update.url); closeModal(); } },
   openfeedback() { fb = fb && !fb.done ? fb : { type: "Idea", msg: "", email: "", meta: true }; openModal(feedbackHTML()); },
   fbtype(el) { fb.type = el.dataset.v; openModal(feedbackHTML()); },
   async sendfeedback() {
@@ -710,6 +769,7 @@ document.addEventListener("input", e => {
   if (a === "q") { query = t.value; const pos = t.selectionStart; render(); const q = $("#q"); if (q) { q.focus(); q.setSelectionRange(pos, pos); } }
   if (a === "tend") { pay.tendered = t.value; const tot = cartTotals().total, v = +t.value || 0; $("#chg").textContent = v >= tot ? peso(v - tot) : "—"; $("#confirmPay").disabled = v < tot; }
   if (a === "pref") pay.ref = t.value;
+  if (a === "cust") { custName = t.value; document.querySelectorAll("#cust").forEach(x => { if (x !== t) x.value = t.value; }); }
   if (a === "scid") pay.scId = t.value;
   if (a === "fbmsg") fb.msg = t.value;
   if (a === "fbemail") fb.email = t.value;
@@ -740,8 +800,8 @@ document.addEventListener("change", async e => {
   const dev = plug("Device"); if (isNative && dev) { try { const i = await dev.getInfo(); deviceInfo = `${i.manufacturer || ""} ${i.model || ""} · Android ${i.osVersion || ""}`.trim(); } catch (e) {} }
   const app = plug("App");
   if (isNative && app) {
-    app.addListener("backButton", () => { if (modalOpen()) closeModal(); else if (tab !== "sell") { tab = "sell"; render(); } else app.minimizeApp(); });
-    app.addListener("resume", () => { if (P && Date.now() - (P.lastCheck || 0) > 6 * 3600000) checkUpdates(); if (P) { checkin(); render(); } });
+    app.addListener("backButton", () => { if (modalOpen() && U.phase === "downloading") return; if (modalOpen()) closeModal(); else if (tab !== "sell") { tab = "sell"; render(); } else app.minimizeApp(); });
+    app.addListener("resume", () => { if (U.phase === "permission" && U.path) installUpdate(); if (P && Date.now() - (P.lastCheck || 0) > 6 * 3600000) checkUpdates(); if (P) { checkin(); render(); } });
     app.addListener("pause", () => { if (P) save(true); });
   }
   render();

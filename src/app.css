@@ -231,3 +231,18 @@ table.t tr:last-child td{border-bottom:0}
 .help::after{content:"";position:absolute;inset:-10px}
 .help:hover,.help:focus-visible{color:var(--brand);border-color:var(--brand)}
 .card h2{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+
+/* order type: solid fill when chosen, visible on every Android version */
+.otype button{color:var(--ink)}
+.otype button[aria-pressed="true"]{background:var(--brand);color:var(--brand-ink);box-shadow:0 2px 8px rgba(0,0,0,.15)}
+/* item pictures in the order and at payment */
+.cthumb{border-radius:12px;background-size:cover;background-position:center;display:grid;place-items:center;color:#fff;font-weight:800;font-size:13px;flex:none}
+.line{grid-template-columns:44px 1fr auto auto}
+.psum{background:var(--surface-2);border-radius:16px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;max-height:38vh;overflow:auto}
+.pline{display:flex;align-items:center;gap:12px}
+
+/* update window */
+.updicon{display:flex;align-items:center;gap:14px;background:var(--surface-2);border-radius:16px;padding:12px 14px}
+.updicon svg{flex:none}
+.updbar{height:12px;border-radius:999px;background:var(--surface-2);overflow:hidden}
+.updbar i{display:block;height:100%;background:#2343D9;border-radius:999px;transition:width .2s}
