@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<base target="_blank">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=Figtree:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+:root{--ink:#14171C;--blue:#2343D9;--blue-soft:#E9EDFD;--mango:#FFB627;--paper:#F2F3F6;--line:#DFE2E8;--muted:#5E6573;--good:#157F3D;--good-soft:#DDF3E4;--bad:#B42318;--bad-soft:#FBE2DF;--warn:#A35A05;--warn-soft:#FCEFD9}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 Figtree,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.hidden{display:none!important}.muted{color:var(--muted)}.small{font-size:13px}.num{font-variant-numeric:tabular-nums}.mono{font-family:"IBM Plex Mono",monospace;font-size:12.5px}
+header{background:var(--ink);color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:20}
+.logo{font-family:"Bricolage Grotesque",sans-serif;font-size:21px;font-weight:800;letter-spacing:-.03em}.logo span{color:#8DA2FF}
+header .sub{color:#AEB4C0;font-size:14px;flex:1}
+nav.tabs{display:flex;gap:4px;padding:10px 20px 0;max-width:1180px;margin:0 auto;overflow-x:auto}
+nav.tabs button{border:0;background:transparent;padding:10px 14px;border-radius:12px 12px 0 0;font-weight:700;color:var(--muted);white-space:nowrap;cursor:pointer;border-bottom:3px solid transparent}
+nav.tabs button[aria-current="page"]{color:var(--ink);border-bottom-color:var(--blue)}
+.badge{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--mango);color:var(--ink);font-size:12px;font-weight:800;margin-left:6px}
+main{max-width:1180px;margin:0 auto;padding:16px 20px 48px;display:flex;flex-direction:column;gap:16px}
+.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px 20px;min-width:0}
+.card h2{margin:0 0 10px;font-size:17px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.tile{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+.tile .k{font-size:13px;color:var(--muted);font-weight:600}.tile .v{font-size:28px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:860px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.btn{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 15px;font-weight:700;min-height:40px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;color:var(--ink);white-space:nowrap}
+.btn.primary{background:var(--blue);color:#fff;border-color:transparent}.btn.good{background:var(--good);color:#fff;border-color:transparent}.btn.danger{color:var(--bad)}
+.btn.sm{min-height:34px;padding:5px 12px;font-size:13px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.inp{border:1px solid var(--line);border-radius:11px;padding:9px 12px;background:#fff;width:100%;min-height:42px;font-size:15px}
+label.f{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:700;color:var(--muted)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font-size:12.5px;font-weight:700;white-space:nowrap}
+.chip::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.chip.good{background:var(--good-soft);color:var(--good)}.chip.warn{background:var(--warn-soft);color:var(--warn)}.chip.bad{background:var(--bad-soft);color:var(--bad)}.chip.info{background:var(--blue-soft);color:var(--blue)}.chip.grey{background:var(--paper);color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:11px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+.tablewrap{overflow-x:auto}
+.empty{color:var(--muted);text-align:center;padding:22px 10px}
+.item{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.item:last-child{border-bottom:0}
+.item .grow{flex:1;min-width:200px}
+.result{padding:10px 12px;border-radius:11px;font-weight:600;font-size:14px}
+.result.good{background:var(--good-soft);color:var(--good)}.result.bad{background:var(--bad-soft);color:var(--bad)}.result.warn{background:var(--warn-soft);color:var(--warn)}
+.gate{min-height:80vh;display:grid;place-items:center;padding:20px}
+.gate .card{max-width:400px;width:100%;display:flex;flex-direction:column;gap:12px}
+.pin{font-size:24px;letter-spacing:.3em;text-align:center;font-family:"IBM Plex Mono",monospace}
+#modal{position:fixed;inset:0;background:rgba(20,23,28,.55);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50}
+#modal .box{background:#fff;border-radius:20px;max-width:520px;width:100%;max-height:calc(100% - 16px);overflow:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
+.mhead{display:flex;justify-content:space-between;align-items:center;gap:10px}.mhead h2{margin:0;font-size:18px}
+.x{border:0;background:var(--paper);width:36px;height:36px;border-radius:50%;font-size:20px;cursor:pointer}
+.plans{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.plans button{border:1px solid var(--line);background:#fff;border-radius:12px;padding:10px;font-weight:700;cursor:pointer;text-align:left}
+.plans button small{display:block;color:var(--muted);font-weight:600}
+.plans button[aria-pressed="true"]{border:2px solid var(--blue);background:var(--blue-soft);padding:9px}
+.summary{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:14px;margin:0;background:var(--paper);border-radius:12px;padding:12px 14px}
+.summary dt{color:var(--muted);font-weight:600}.summary dd{margin:0;font-weight:700}
+.unread{border-left:3px solid var(--blue);padding-left:10px}
+.search{max-width:320px}
+.keybar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--paper);border-radius:12px;padding:10px 12px;font-size:14px}
+.filebtn{position:relative;overflow:hidden}.filebtn input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.help{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line);background:#fff;color:var(--muted);font-size:12px;font-weight:800;display:inline-grid;place-items:center;padding:0;margin-left:6px;cursor:pointer;vertical-align:middle;position:relative}
+.help::after{content:"";position:absolute;inset:-10px}.help:hover{color:var(--blue);border-color:var(--blue)}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-weight:600;z-index:60}
+</style>
+</head>
+<body>
+<header><span class="logo">Own<span>POS</span></span><span class="sub">Admin</span><button class="btn sm hidden" id="refresh" style="background:#2A2F38;color:#fff;border-color:#2A2F38">Refresh</button><button class="btn sm hidden" id="lock" style="background:#2A2F38;color:#fff;border-color:#2A2F38">Lock</button></header>
+<div id="gate" class="gate"><div class="card"><h2 id="gateTitle">Enter your PIN</h2><p class="muted small" id="gateHelp"></p>
+  <input class="inp pin" id="pin" type="password" inputmode="numeric" autocomplete="current-password" aria-label="PIN">
+  <input class="inp pin hidden" id="pin2" type="password" inputmode="numeric" placeholder="again" aria-label="Repeat PIN">
+  <button class="btn primary" id="gateBtn">Open dashboard</button><div id="gateMsg"></div></div></div>
+<div id="dash" class="hidden">
+  <nav class="tabs" aria-label="Sections"></nav>
+  <main id="main"></main>
+</div>
+<div id="modal" class="hidden" role="dialog" aria-modal="true"><div class="box" id="mbox"></div></div>
+<div id="helpbox" class="hidden" role="dialog" aria-modal="true" style="position:fixed;inset:0;background:rgba(20,23,28,.55);display:flex;align-items:center;justify-content:center;padding:16px;z-index:55"><div class="box" style="background:#fff;border-radius:20px;max-width:460px;width:100%;padding:20px;display:flex;flex-direction:column;gap:10px" id="helpinner"></div></div>
+<div id="toast" class="hidden" role="status"></div>
+<script>
+"use strict";
+const PUBLIC_KEY = {"kty":"EC","x":"7ihrw8BNkag91hQgrzP5RCkTUBq6gsxj2jLS-USLln8","y":"BWZuO11vfiz1uEkRz11pTES7i5wRCJnLCtfIA3e3fcE","crv":"P-256"};
+const PLANS = { Monthly: { days: 30, price: 500 }, Quarterly: { days: 90, price: 1500 }, Annual: { days: 365, price: 5000 }, Free: { days: 7, price: 0 } };
+const DAY = 86400000;
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fromIso = s => Math.round(Date.parse(String(s).slice(0, 10) + "T00:00:00Z") / DAY);
+const iso = n => new Date(n * DAY).toISOString().slice(0, 10);
+const nice = n => new Date(n * DAY).toLocaleDateString("en-PH", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" });
+const short = n => new Date(n * DAY).toLocaleDateString("en-PH", { timeZone: "UTC", month: "short", day: "numeric" });
+const peso = n => "₱" + Math.round(Number(n) || 0).toLocaleString("en-PH");
+const ago = t => { const m = Math.round((Date.now() - Date.parse(t)) / 60000); if (!(m >= 0)) return "—"; if (m < 2) return "just now"; if (m < 60) return m + " min ago"; const h = Math.round(m / 60); if (h < 24) return h + " h ago"; const d = Math.round(h / 24); return d + (d === 1 ? " day ago" : " days ago"); };
+const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const enc = new TextEncoder();
+const run = (fn, ...args) => new Promise((res, rej) => google.script.run.withSuccessHandler(res).withFailureHandler(e => rej(e && e.message ? e : new Error(String(e))))[fn](...args));
+function mem(k, v) { try { if (v === undefined) return sessionStorage.getItem(k); if (v === null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch (e) { return null; } }
+function keep(k, v) { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { return null; } }
+let toastT; function toast(m) { const t = $("#toast"); t.textContent = m; t.classList.remove("hidden"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.add("hidden"), 2600); }
+
+const HELP = {
+  tiles: ["The numbers at the top", "A quick look at your business.", ["Stores: every store that has opened OwnPOS while online.", "On trial: stores still in their free 30 days.", "Paying: stores with a paid plan that hasn’t ended (or is in its 7-day grace period).", "Need attention: stores ending within 7 days or already ended in the last 7 days. These are the ones to remind.", "Collected this month: total of the licenses you issued this month."]],
+  payments: ["Payments to approve", "Renewal requests stores sent from their app, with the GCash reference they typed.", ["Open your GCash app and check you really received that amount with that reference.", "Approve signs a license and sends it. The store’s app picks it up by itself the next time it’s online.", "Reject if you can’t find the payment. Contact the owner to sort it out."]],
+  ending: ["Ending soon or ended", "Stores that need a nudge.", ["Text reminder opens your phone’s SMS app with a ready-made message.", "Renew lets you send them more time, for example if they paid you in cash."]],
+  stores: ["Stores", "Every store using OwnPOS. A store appears here the first time it opens the app while online, and its details update whenever it goes online again.", ["Last online tells you when its app last checked in. A store that’s been offline for long won’t get your licenses or updates until it reconnects.", "“License sent, waiting…” means you renewed it but its app hasn’t been online since.", "Renew / extend sends more time. Choose Free days to give extra days at no charge.", "Note is private, only for you."]],
+  feedback: ["Feedback", "Ideas, problems and praise sent from inside the app. A copy is also emailed to you.", ["New ones have a blue line. Mark them read once you’ve handled them."]],
+  licenses: ["Licenses issued", "Every license you’ve sent, with the amount and GCash reference. This is your sales record for OwnPOS.", ["Everything here is also in your Google Sheet, in the Licenses tab."]],
+  issue: ["Renew or extend", "This signs a license with your private key so the store’s app knows it’s really from you.", ["The new time starts from their current end date, or from today if their plan already ended.", "Your key stays in this browser. Tick Remember only on your own phone or laptop.", "Free days add time without a charge, for example to make up for a problem."]]
+};
+const hb = k => `<button class="help" data-help="${k}" aria-label="What is this?">?</button>`;
+let PIN = mem("ownpos-pin"), D = null, tab = "overview", privKey = null, q = "";
+
+/* ---------- PIN gate ---------- */
+async function gate() {
+  const st = await run("pinState");
+  if (!st.hasPin) { $("#gateTitle").textContent = "Create your admin PIN"; $("#gateHelp").textContent = "At least 6 digits. You'll enter it each time you open the dashboard. Only you should know it."; $("#pin2").classList.remove("hidden"); $("#gateBtn").textContent = "Create PIN"; }
+  else { $("#gateHelp").textContent = "OwnPOS admin dashboard."; if (PIN) open_(); }
+}
+$("#gateBtn").addEventListener("click", async () => {
+  const p = $("#pin").value.trim(); $("#gateMsg").innerHTML = "";
+  try {
+    if (!$("#pin2").classList.contains("hidden")) { if (p !== $("#pin2").value.trim()) throw new Error("The two PINs don't match."); await run("createPin", p); }
+    PIN = p; await open_();
+  } catch (e) { $("#gateMsg").innerHTML = `<div class="result bad">${esc(e.message)}</div>`; }
+});
+$("#pin").addEventListener("keydown", e => { if (e.key === "Enter" && $("#pin2").classList.contains("hidden")) $("#gateBtn").click(); });
+async function open_() {
+  try { D = await run("adminLoad", PIN); }
+  catch (e) { PIN = null; mem("ownpos-pin", null); $("#gate").classList.remove("hidden"); $("#dash").classList.add("hidden"); $("#gateMsg").innerHTML = `<div class="result bad">${esc(e.message)}</div>`; return; }
+  mem("ownpos-pin", PIN); $("#gate").classList.add("hidden"); $("#dash").classList.remove("hidden"); $("#refresh").classList.remove("hidden"); $("#lock").classList.remove("hidden");
+  render();
+}
+$("#lock").addEventListener("click", () => { PIN = null; D = null; mem("ownpos-pin", null); location.reload(); });
+$("#refresh").addEventListener("click", async () => { $("#refresh").textContent = "…"; try { D = await run("adminLoad", PIN); render(); toast("Up to date"); } catch (e) { toast(e.message); } $("#refresh").textContent = "Refresh"; });
+
+/* ---------- derived data ---------- */
+function stores() {
+  const today = fromIso(D.today);
+  return D.stores.map(s => {
+    const lics = D.licenses.filter(l => l.deviceId === s.deviceId).sort((a, b) => String(b.end).localeCompare(String(a.end)));
+    const sent = lics[0] && (!s.planEnd || lics[0].end > s.planEnd) ? lics[0] : null;
+    const end = fromIso(sent ? sent.end : s.planEnd || D.today), d = end - today;
+    const trial = !sent && s.plan === "Trial";
+    let key, label;
+    if (d > 7) { key = trial ? "info" : "good"; label = trial ? "On trial" : "Paid"; }
+    else if (d >= 0) { key = "warn"; label = d === 0 ? "Ends today" : `Ends in ${d}d`; }
+    else if (d >= -7) { key = "bad"; label = `Ended · ${7 + d}d grace`; }
+    else { key = "grey"; label = "Selling paused"; }
+    const paid = lics.reduce((a, l) => a + (Number(l.amount) || 0), 0);
+    return Object.assign({}, s, { end, d, trial, key, label, sent, paid });
+  }).sort((a, b) => a.d - b.d);
+}
+const pending = () => D.requests.filter(r => r.status === "pending").sort((a, b) => String(a.at).localeCompare(String(b.at)));
+const unread = () => D.feedback.filter(f => String(f.read) !== "true");
+
+/* ---------- render ---------- */
+function render() {
+  const tabs = [["overview", "Overview"], ["stores", "Stores"], ["payments", "Payments", pending().length], ["feedback", "Feedback", unread().length], ["licenses", "Licenses"]];
+  $("nav.tabs").innerHTML = tabs.map(([k, l, n]) => `<button data-tab="${k}" ${tab === k ? 'aria-current="page"' : ""}>${l}${n ? `<span class="badge">${n}</span>` : ""}</button>`).join("");
+  $("#main").innerHTML = { overview, stores: storesView, payments: paymentsView, feedback: feedbackView, licenses: licensesView }[tab]();
+}
+function overview() {
+  const S = stores(), month = D.today.slice(0, 7);
+  const rev = D.licenses.filter(l => String(l.at).slice(0, 7) === month).reduce((a, l) => a + (Number(l.amount) || 0), 0);
+  const soon = S.filter(s => s.d >= -7 && s.d <= 7);
+  return `<div class="row small muted" style="font-weight:700">At a glance ${hb("tiles")}</div><div class="tiles">
+      <div class="tile"><div class="k">Stores</div><div class="v">${S.length}</div></div>
+      <div class="tile"><div class="k">On trial</div><div class="v">${S.filter(s => s.trial && s.d >= 0).length}</div></div>
+      <div class="tile"><div class="k">Paying</div><div class="v">${S.filter(s => !s.trial && s.d >= -7).length}</div></div>
+      <div class="tile"><div class="k">Need attention</div><div class="v">${soon.length}</div></div>
+      <div class="tile"><div class="k">Collected this month</div><div class="v">${peso(rev)}</div></div></div>
+    <div class="grid2">
+      <div class="card"><h2>Payments to approve ${hb("payments")}</h2>${pending().map(reqItem).join("") || `<div class="empty">Nothing to approve.</div>`}</div>
+      <div class="card"><h2>Ending soon or ended ${hb("ending")}</h2>${soon.map(s => `<div class="item"><div class="grow"><b>${esc(s.store)}</b> <span class="chip ${s.key}">${s.label}</span><div class="small muted">${esc(s.owner)} · ${esc(s.mobile)} · ends ${short(s.end)}</div></div><div class="row">${remindBtn(s)}<button class="btn sm primary" data-issue="${esc(s.deviceId)}">Renew</button></div></div>`).join("") || `<div class="empty">No store is near its end date.</div>`}</div></div>
+    <div class="card"><h2>Latest feedback</h2>${D.feedback.slice().reverse().slice(0, 3).map(fbItem).join("") || `<div class="empty">No feedback yet.</div>`}</div>
+    <p class="small muted">All data is in your Google Sheet: <a href="${esc(D.sheetUrl)}">open the sheet</a>.</p>`;
+}
+function remindBtn(s) {
+  const what = s.trial ? "free trial" : "OwnPOS plan", when = s.d > 0 ? `ends on ${nice(s.end)}` : s.d === 0 ? "ends today" : `ended on ${nice(s.end)}`;
+  const text = `Hi ${String(s.owner).split(" ")[0]}! Your ${what} for ${s.store} ${when}. To keep selling, open OwnPOS → Subscription and send ₱500 by GCash. Salamat po! — OwnPOS`;
+  const num = String(s.mobile).replace(/[^\d+]/g, "");
+  return num ? `<a class="btn sm" href="sms:${esc(num)}?body=${encodeURIComponent(text)}" target="_top">Text reminder</a>` : "";
+}
+function reqItem(r) {
+  const s = D.stores.find(x => x.deviceId === r.deviceId);
+  return `<div class="item"><div class="grow"><b>${esc(r.store)}</b> · <span class="num">${peso(r.amount)}</span> ${esc(r.plan)}
+    <div class="small muted">GCash ref <b class="num" style="color:var(--ink)">${esc(r.ref || "not entered")}</b> · ${esc(r.owner)} · ${ago(r.at)}</div>
+    <div class="small muted">Check your GCash for this payment before approving.</div></div>
+    <div class="row"><button class="btn sm danger" data-reject="${esc(r.id)}">Reject</button><button class="btn sm good" data-approve="${esc(r.id)}">Approve</button></div></div>`;
+}
+function fbItem(f) {
+  return `<div class="item ${String(f.read) !== "true" ? "unread" : ""}"><div class="grow"><b>${esc(f.type)}</b> · ${esc(f.store)} <span class="small muted">· ${ago(f.at)}</span>
+    <div style="white-space:pre-wrap;margin-top:4px">${esc(f.message)}</div>
+    <div class="small muted">${esc(f.owner)}${f.email ? ` · <a href="mailto:${esc(f.email)}" target="_top">${esc(f.email)}</a>` : ""}${f.meta ? " · " + esc(f.meta) : ""}</div></div>
+    ${String(f.read) !== "true" ? `<button class="btn sm" data-read="${esc(f.id)}">Mark read</button>` : ""}</div>`;
+}
+function storesView() {
+  const S = stores().filter(s => !q || (s.store + s.owner + s.mobile + s.deviceId).toLowerCase().includes(q.toLowerCase()));
+  return `<div class="card"><div class="row" style="justify-content:space-between;margin-bottom:8px"><h2 style="margin:0">Stores ${hb("stores")} <span class="muted small">(${D.stores.length})</span></h2><input class="inp search" id="q" placeholder="Search store, owner, number" value="${esc(q)}"></div>
+    <div class="tablewrap"><table><thead><tr><th>Store</th><th>Status</th><th>Plan ends</th><th>Last online</th><th>App</th><th>Paid so far</th><th></th></tr></thead><tbody>
+    ${S.map(s => `<tr><td><b>${esc(s.store)}</b><div class="small muted">${esc(s.owner)} · <a href="tel:${esc(s.mobile)}" target="_top">${esc(s.mobile)}</a></div><div class="mono muted">${esc(s.deviceId)}${s.storeType ? " · " + esc(s.storeType) : ""}</div>${s.note ? `<div class="small" style="margin-top:4px">📝 ${esc(s.note)}</div>` : ""}</td>
+      <td><span class="chip ${s.key}">${s.label}</span>${s.sent ? `<div class="small muted" style="margin-top:4px">License sent, waiting for the app to go online</div>` : ""}</td>
+      <td class="num">${nice(s.end)}</td><td>${ago(s.lastSeen)}</td><td>${esc(s.version)}</td><td class="num">${peso(s.paid)}</td>
+      <td><div class="row" style="justify-content:flex-end;flex-wrap:nowrap"><button class="btn sm" data-note="${esc(s.deviceId)}">Note</button>${remindBtn(s)}<button class="btn sm primary" data-issue="${esc(s.deviceId)}">Renew / extend</button></div></td></tr>`).join("") || `<tr><td colspan="7" class="empty">${q ? "No store matches." : "No stores yet. They appear here when a store opens OwnPOS while online."}</td></tr>`}
+    </tbody></table></div></div>`;
+}
+function paymentsView() {
+  const done = D.requests.filter(r => r.status !== "pending").slice().reverse();
+  return `<div class="card"><h2>Waiting for you ${hb("payments")}</h2>${pending().map(reqItem).join("") || `<div class="empty">Nothing to approve.</div>`}</div>
+    <div class="card"><h2>Handled</h2><div class="tablewrap"><table><thead><tr><th>Received</th><th>Store</th><th>Plan</th><th>GCash ref</th><th>Status</th></tr></thead><tbody>
+    ${done.map(r => `<tr><td>${short(fromIso(r.at))}</td><td>${esc(r.store)}</td><td>${esc(r.plan)} · ${peso(r.amount)}</td><td class="num">${esc(r.ref)}</td><td><span class="chip ${r.status === "approved" ? "good" : "bad"}">${r.status === "approved" ? "Approved" : "Rejected"}</span></td></tr>`).join("") || `<tr><td colspan="5" class="empty">None yet.</td></tr>`}</tbody></table></div></div>`;
+}
+function feedbackView() {
+  return `<div class="card"><div class="row" style="justify-content:space-between;margin-bottom:6px"><h2 style="margin:0">Feedback ${hb("feedback")}</h2>${unread().length ? `<button class="btn sm" data-read="*">Mark all read</button>` : ""}</div>${D.feedback.slice().reverse().map(fbItem).join("") || `<div class="empty">No feedback yet.</div>`}</div>`;
+}
+function licensesView() {
+  return `<div class="card"><h2>Licenses issued ${hb("licenses")}</h2><div class="tablewrap"><table><thead><tr><th>Issued</th><th>Store</th><th>Plan</th><th>Amount</th><th>Valid</th><th>GCash ref</th></tr></thead><tbody>
+    ${D.licenses.slice().reverse().map(l => `<tr><td>${short(fromIso(l.at))}</td><td>${esc(l.store)}<div class="mono muted">${esc(l.deviceId)}</div></td><td>${esc(l.plan)}</td><td class="num">${peso(l.amount)}</td><td class="num">${short(fromIso(l.start))} – ${nice(fromIso(l.end))}</td><td class="num">${esc(l.ref)}</td></tr>`).join("") || `<tr><td colspan="6" class="empty">None yet.</td></tr>`}</tbody></table></div></div>`;
+}
+
+/* ---------- issue a license ---------- */
+let issue = null;
+async function loadKey(jwkText) {
+  const j = JSON.parse(jwkText), jwk = j.jwk || j;
+  if (!jwk.d) throw new Error("That file has no private key in it.");
+  if (jwk.x !== PUBLIC_KEY.x || jwk.y !== PUBLIC_KEY.y) throw new Error("This key doesn't match OwnPOS.");
+  privKey = await crypto.subtle.importKey("jwk", { kty: "EC", crv: "P-256", x: jwk.x, y: jwk.y, d: jwk.d }, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+  return jwk;
+}
+(async () => { const k = keep("ownpos-admin-key"); if (k) { try { await loadKey(k); } catch (e) { keep("ownpos-admin-key", null); } } })();
+function openIssue(deviceId, req) {
+  const s = stores().find(x => x.deviceId === deviceId) || { deviceId, store: req ? req.store : deviceId, end: fromIso(D.today) };
+  issue = { s, req, plan: req ? req.plan : "Monthly", ref: req ? req.ref : "", freeDays: 7 };
+  drawIssue();
+}
+function issueCalc() {
+  const today = fromIso(D.today), start = Math.max(issue.s.end, today);
+  const days = issue.plan === "Free" ? Math.max(1, Number(issue.freeDays) || 0) : PLANS[issue.plan].days;
+  return { start, end: start + days, amount: issue.plan === "Free" ? 0 : PLANS[issue.plan].price };
+}
+function drawIssue(msg) {
+  const c = issueCalc();
+  $("#mbox").innerHTML = `<div class="mhead"><h2>${issue.req ? "Approve payment" : "Renew or extend"} · ${esc(issue.s.store)} ${hb("issue")}</h2><button class="x" data-close aria-label="Close">×</button></div>
+    ${privKey ? `<div class="keybar"><span class="chip good">Signing key ready</span><span class="grow small muted" style="flex:1">Saved on this device</span><button class="btn sm" data-forget>Forget key</button></div>`
+      : `<div class="keybar"><span style="flex:1">Load <b>OwnPOS-license-private-key.json</b> to sign licenses.</span><span class="btn sm filebtn">Choose file<input type="file" id="keyfile" accept=".json"></span></div>
+         <label class="row small" style="font-weight:600"><input type="checkbox" id="remember" checked> Remember the key on this device (only use on your own phone or laptop)</label>`}
+    <div class="plans" role="group" aria-label="Plan">${Object.entries(PLANS).map(([k, p]) => `<button data-plan="${k}" aria-pressed="${issue.plan === k}">${k === "Free" ? "Free days" : k}<small>${k === "Free" ? "No charge · goodwill or fix" : peso(p.price) + " · " + p.days + " days"}</small></button>`).join("")}</div>
+    ${issue.plan === "Free" ? `<label class="f">How many free days<input class="inp num" id="freeDays" type="number" min="1" max="365" value="${esc(issue.freeDays)}"></label>` : `<label class="f">GCash reference<input class="inp num" id="iref" value="${esc(issue.ref)}"></label>`}
+    <dl class="summary"><dt>Device</dt><dd class="mono">${esc(issue.s.deviceId)}</dd><dt>Counts from</dt><dd>${nice(c.start)}</dd><dt>New end date</dt><dd style="color:var(--blue)">${nice(c.end)}</dd><dt>Amount</dt><dd>${peso(c.amount)}</dd></dl>
+    <button class="btn primary" id="doIssue" ${privKey ? "" : "disabled"}>${issue.req ? "Approve and send license" : "Send license"}</button>
+    <p class="small muted" style="margin:0">The license reaches their app automatically the next time it's online.</p>${msg || ""}`;
+  $("#modal").classList.remove("hidden");
+}
+async function doIssue() {
+  const c = issueCalc(), plan = issue.plan === "Free" ? "Extension" : issue.plan, dev = issue.s.deviceId;
+  const payload = { sid: dev, dev, plan, iat: iso(c.start), exp: iso(c.end) };
+  const body = b64u(enc.encode(JSON.stringify(payload)));
+  const sig = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, privKey, enc.encode(body));
+  const token = `OWNPOS1.${body}.${b64u(sig)}`;
+  const pub = await crypto.subtle.importKey("jwk", PUBLIC_KEY, { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
+  if (!(await crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, pub, new Uint8Array(sig), enc.encode(body)))) throw new Error("Signing failed. Load the key again.");
+  $("#doIssue").disabled = true; $("#doIssue").textContent = "Saving…";
+  D = await run("adminSaveLicense", PIN, { deviceId: dev, store: issue.s.store, plan, amount: c.amount, start: payload.iat, end: payload.exp, ref: issue.ref, requestId: issue.req ? issue.req.id : "", token });
+  const text = `Hi! Your OwnPOS is renewed until ${nice(c.end)}. It activates by itself when OwnPOS is online. Or paste this in Subscription → Activate a license:\n\n${token}`;
+  $("#mbox").innerHTML = `<div class="mhead"><h2>License sent</h2><button class="x" data-close aria-label="Close">×</button></div>
+    <div class="result good">${esc(issue.s.store)} is active until ${nice(c.end)}. Their app picks it up the next time it's online.</div>
+    <p class="small muted" style="margin:0">If their tablet stays offline, send them this message to paste:</p>
+    <textarea class="inp mono" rows="5" readonly id="msgtxt">${esc(text)}</textarea><div class="row"><button class="btn" id="copyMsg">Copy message</button><button class="btn primary" data-close>Done</button></div>`;
+  render();
+}
+
+/* ---------- events ---------- */
+document.addEventListener("click", async e => {
+  const t = e.target.closest("button,[data-close]"); if (!t) { if (e.target.id === "modal") $("#modal").classList.add("hidden"); if (e.target.id === "helpbox") $("#helpbox").classList.add("hidden"); return; }
+  try {
+    if (t.dataset.help) { const h = HELP[t.dataset.help]; $("#helpinner").innerHTML = `<div class="mhead"><h2>${esc(h[0])}</h2><button class="x" data-helpclose aria-label="Close">×</button></div><p style="margin:0">${esc(h[1])}</p>${h[2] ? `<ul style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">${h[2].map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}<button class="btn primary" data-helpclose>Got it</button>`; $("#helpbox").classList.remove("hidden"); return; }
+    if (t.hasAttribute("data-helpclose")) { $("#helpbox").classList.add("hidden"); return; }
+    if (t.dataset.tab) { tab = t.dataset.tab; render(); window.scrollTo(0, 0); }
+    else if (t.hasAttribute("data-close")) $("#modal").classList.add("hidden");
+    else if (t.dataset.issue) openIssue(t.dataset.issue);
+    else if (t.dataset.approve) { const r = D.requests.find(x => x.id === t.dataset.approve); openIssue(r.deviceId, r); }
+    else if (t.dataset.reject) { t.disabled = true; D = await run("adminReject", PIN, t.dataset.reject); render(); toast("Request rejected"); }
+    else if (t.dataset.read) { t.disabled = true; D = await run("adminMarkRead", PIN, t.dataset.read); render(); }
+    else if (t.dataset.note) { const s = D.stores.find(x => x.deviceId === t.dataset.note); $("#mbox").innerHTML = `<div class="mhead"><h2>Note · ${esc(s.store)}</h2><button class="x" data-close aria-label="Close">×</button></div><textarea class="inp" id="noteTxt" rows="4" placeholder="Only you see this">${esc(s.note)}</textarea><button class="btn primary" id="saveNote" data-dev="${esc(s.deviceId)}">Save note</button>`; $("#modal").classList.remove("hidden"); }
+    else if (t.id === "saveNote") { D = await run("adminNote", PIN, t.dataset.dev, $("#noteTxt").value); $("#modal").classList.add("hidden"); render(); toast("Note saved"); }
+    else if (t.dataset.plan) { issue.plan = t.dataset.plan; drawIssue(); }
+    else if (t.hasAttribute("data-forget")) { keep("ownpos-admin-key", null); privKey = null; drawIssue(); }
+    else if (t.id === "doIssue") await doIssue();
+    else if (t.id === "copyMsg") { try { await navigator.clipboard.writeText($("#msgtxt").value); toast("Copied"); } catch (err) { $("#msgtxt").select(); toast("Select and copy the text"); } }
+  } catch (err) { toast(err.message || "Something went wrong"); if (issue && t.id === "doIssue") drawIssue(`<div class="result bad">${esc(err.message)}</div>`); }
+});
+document.addEventListener("input", e => {
+  if (e.target.id === "q") { q = e.target.value; const pos = e.target.selectionStart; render(); const el = $("#q"); el.focus(); el.setSelectionRange(pos, pos); }
+  if (e.target.id === "iref") issue.ref = e.target.value;
+  if (e.target.id === "freeDays") { issue.freeDays = e.target.value; const c = issueCalc(); const dd = $("#mbox .summary dd:nth-of-type(3)"); if (dd) dd.textContent = nice(c.end); }
+});
+document.addEventListener("change", async e => {
+  if (e.target.id !== "keyfile" || !e.target.files[0]) return;
+  try { const txt = await e.target.files[0].text(); const jwk = await loadKey(txt); if ($("#remember") && $("#remember").checked) keep("ownpos-admin-key", JSON.stringify(jwk)); drawIssue(); }
+  catch (err) { drawIssue(`<div class="result bad">${esc(err.message)}</div>`); }
+});
+gate().catch(e => { $("#gateMsg").innerHTML = `<div class="result bad">${esc(e.message)}</div>`; });
+</script>
+</body>
+</html>

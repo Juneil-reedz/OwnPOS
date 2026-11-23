@@ -27,6 +27,7 @@ jobs:
     env:
       OWNPOS_VERSION: ${{ github.event.inputs.version }}
       WEB3FORMS_KEY: ${{ secrets.WEB3FORMS_KEY }}
+      OWNPOS_SERVER_URL: ${{ vars.OWNPOS_SERVER_URL }}
       GCASH_NAME: ${{ vars.GCASH_NAME }}
       GCASH_NUMBER: ${{ vars.GCASH_NUMBER }}
       RELEASE: ${{ github.event.inputs.version != '' }}

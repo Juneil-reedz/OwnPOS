@@ -7,7 +7,8 @@ Each store's sales, menu and brand are saved only on its own device. No shared d
 - Works offline. Renewal reminders are worked out on the device from a signed license.
 - Each store can change its colours, font, logo and receipt.
 - Digital receipts with a QR code and a verification code.
-- Feedback and update checks inside the app.
+- Feedback and update checks inside the app, and a **?** on every section explaining it.
+- Admin dashboard (free, in your Google account): stores, payments to approve, feedback, licenses. See [server/SETUP.md](server/SETUP.md).
 
 ## Install on Android
 
@@ -31,9 +32,13 @@ which is **never** stored in this repository. A license is tied to one device ID
 |---|---|
 | `ANDROID_KEYSTORE_BASE64` | The signing key, base64. Keep the same one forever, or updates won't install. |
 | `ANDROID_KEYSTORE_PASSWORD` | Its password |
-| `WEB3FORMS_KEY` | Optional. Feedback goes to your email through Web3Forms. Without it, feedback opens an email draft. |
 
-Optional variables: `GCASH_NAME`, `GCASH_NUMBER` (shown on the renewal screen).
+Variables (same page, **Variables** tab):
+
+| Name | What it is |
+|---|---|
+| `OWNPOS_SERVER_URL` | Your OwnPOS Server web app URL. Turns on the admin dashboard, automatic feedback and automatic license delivery. See [server/SETUP.md](server/SETUP.md). |
+| `GCASH_NAME`, `GCASH_NUMBER` | Optional. Override the GCash details shown on the renewal screen. |
 
 ## Develop
 

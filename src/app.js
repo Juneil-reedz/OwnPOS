@@ -6,7 +6,7 @@
    - Feedback goes to Web3Forms when online, else waits in an outbox.
    - Updates are checked against GitHub Releases.
    ========================================================= */
-const CFG = Object.assign({ version: "0.0.0-dev", web3formsKey: "", repo: "Juneil-reedz/OwnPOS", email: "areedzgonzales@gmail.com", gcashName: "", gcashNumber: "", publicKey: null }, window.OWNPOS_CONFIG || {});
+const CFG = Object.assign({ version: "0.0.0-dev", server: "", web3formsKey: "", repo: "Juneil-reedz/OwnPOS", email: "areedzgonzales@gmail.com", gcashName: "", gcashNumber: "", publicKey: null }, window.OWNPOS_CONFIG || {});
 const DAY = 86400000;
 const FILE = "ownpos-data.json";
 const $ = (s, r = document) => r.querySelector(s);
@@ -110,7 +110,7 @@ function newStore({ name, owner, mobile, type }) {
   const m = menuFrom(type); const preset = PRESETS.find(p => p.id === type) || PRESETS[0]; const today = dayNum(Date.now());
   return {
     v: 1, deviceId: "OWN-" + rnd(4) + "-" + rnd(4), secret: rnd(24), createdAt: Date.now(),
-    owner: { name: owner, mobile }, trial: { start: today, exp: today + 30 }, license: null, lastSeen: Date.now(),
+    storeType: type, owner: { name: owner, mobile }, trial: { start: today, exp: today + 30 }, license: null, lastSeen: Date.now(),
     brand: { name, tagline: "", address: "", tin: "", logo: "", color: preset.color, font: preset.font, corners: preset.corners, tile: "comfortable", photos: true, footer: "Salamat po! Balik po kayo.", vat: false, receiptLogo: true },
     categories: m.categories, products: m.products, sales: [], seq: 0, outbox: [], role: "owner", orderType: "Dine in",
     lastCheck: 0, lastDailyCopy: "", seenVersion: CFG.version
@@ -174,6 +174,30 @@ const ICON = {
 };
 const icon = (n, cls = "i") => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
 
+/* ---------- "?" help ---------- */
+const HELP = {
+  order: ["Current order", "Everything the customer is buying right now. Tap an item on the menu to add it, and use − and + to change how many.", ["Dine in, Take out or Delivery is printed on the receipt so your staff know where the order goes.", "Senior / PWD gives the 20% discount required by law. If you’re VAT-registered, VAT is removed first, then 20% is taken off. You’ll be asked for their ID number.", "Charge opens the payment screen: Cash (with change), GCash or Maya."]],
+  receipts: ["Receipts", "Every sale made on this device, newest first. Tap one to see or resend its receipt.", ["Export CSV makes a spreadsheet file of all your sales. Use it for your bookkeeping or send it to your accountant.", "Sales are saved only on this device. Back them up in Settings."]],
+  bymethod: ["Today by payment", "How much of today’s sales came in as cash, GCash and Maya.", ["At closing, the Cash amount is what should be in your drawer (plus your starting change)."]],
+  verify: ["Check a receipt photo", "Each receipt has a number and a verification code made from the sale’s details.", ["If a customer shows you a photo of a receipt, type its number and code here.", "“Genuine” means this POS really made that receipt for that amount. “No match” means it was edited or isn’t from your store."]],
+  items: ["Items", "Your menu. These are the buttons your cashier taps on the Sell screen.", ["Add item to add something new, with a price, category and optional photo.", "Turn the switch off when something is sold out. It stays on the menu but can’t be sold until you turn it back on.", "Edit to change a price or photo. Old receipts keep the price they were sold at."]],
+  categories: ["Categories", "Groups for your menu, like Ulam, Drinks or Dessert. They show as the tabs on the Sell screen.", ["Use ↑ to change their order.", "You can only remove a category once no items are in it."]],
+  themes: ["Quick themes", "Ready-made looks. One tap sets the colour, font and corner style together.", ["You can still change each part below afterwards."]],
+  storedetails: ["Store details", "Your store’s name, logo, tagline, address and TIN.", ["These appear at the top of the app and on every receipt.", "Your TIN is optional. These digital receipts aren’t official BIR invoices."]],
+  look: ["Look and feel", "Make OwnPOS look like your brand.", ["Brand colour is used for buttons and highlights.", "Font changes your store name and headings.", "Compact item buttons fit more items on screen. Turn photos off if you don’t use them."]],
+  receiptset: ["Receipt", "What your customers see on their receipt.", ["The message at the bottom is a good place for “Salamat po!”, your Facebook page or your Wi-Fi password.", "Tick VAT-registered only if you are registered for VAT with BIR. Your prices are then treated as VAT-inclusive."]],
+  rpreview: ["Receipt preview", "How your receipt looks right now. It updates as you change your brand settings."],
+  plan: ["Your plan", "How many days you have left on your free trial or paid plan. It’s counted on this device, so it works without internet.", ["When the end date passes, you get 7 more days to renew (the grace period).", "After that, selling pauses, but your records are kept and you can still view and export them.", "Device ID is this tablet’s or phone’s OwnPOS number. OwnPOS uses it to send your license to the right device."]],
+  timeline: ["What happens next", "The dates of your reminders and of the end of your plan.", ["You’ll see a banner on these days. No internet needed."]],
+  renew: ["Renew OwnPOS", "How to pay for your next month, 3 months or year.", ["1. Pick a plan and send the amount by GCash to the name and number shown.", "2. Type the GCash reference number from your receipt and tap Send renewal request.", "3. Once OwnPOS sees your payment, your new end date arrives on this device by itself when it’s online. Paying for longer saves money: 12 months is ₱5,000 instead of ₱6,000."]],
+  activate: ["Activate a license", "Use this only if OwnPOS sent you a license code by message, for example if this device was offline for a long time.", ["Scan license QR opens the camera. Point it at the QR code OwnPOS shows you.", "Or paste the whole message OwnPOS sent and tap Activate code."]],
+  updates: ["Updates", "New versions of OwnPOS with fixes and new features.", ["When one is ready, a yellow “Update to…” button appears at the top.", "Updating keeps your sales, menu, brand and license.", "Updates never interrupt a sale. Finish the current order first."]],
+  backup: ["Back up your data", "Your data lives only on this device. If it’s lost, broken or reset, your records go with it, unless you have a backup.", ["Save a backup makes one file with all your sales, menu and brand. Save it to Google Drive or email it to yourself.", "Restore from backup puts that file’s data on this device, for example on a new tablet. It replaces what’s there now."]],
+  feedback: ["Feedback", "Send ideas, problems or praise to the OwnPOS team.", ["If you’re offline, it’s saved and sent automatically when the internet comes back.", "Add your email if you’d like a reply."]],
+  about: ["About this device", "Your store’s OwnPOS details. If you contact OwnPOS for help, they may ask for your Device ID."],
+  role: ["Owner or Cashier", "Cashier mode shows only Sell and Sales, so staff can’t change prices, the menu or your plan."]
+};
+const hb = k => `<button class="help" data-act="help" data-v="${k}" aria-label="What is this?">?</button>`;
 /* ---------- UI helpers ---------- */
 let toastT;
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.remove("hidden"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.add("hidden"), 2800); }
@@ -213,7 +237,33 @@ async function initNetwork() {
   if (isNative && nw) { try { online = (await nw.getStatus()).connected; } catch (e) {} nw.addListener("networkStatusChange", s => { const was = online; online = s.connected; if (online && !was) onReconnect(); render(); }); }
   else { addEventListener("online", () => { online = true; onReconnect(); render(); }); addEventListener("offline", () => { online = false; render(); }); }
 }
-function onReconnect() { flushOutbox(); checkUpdates(); }
+function onReconnect() { flushOutbox(); checkUpdates(); checkin(); }
+
+/* ---------- OwnPOS server (store list, licenses, feedback) ---------- */
+async function api(body) {
+  if (!CFG.server || !online) return null;
+  const r = await fetch(CFG.server, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(Object.assign({ deviceId: P.deviceId }, body)) });
+  const j = await r.json(); return j && j.ok ? j : null;
+}
+let checking = false;
+async function checkin() {
+  if (!P || checking || !CFG.server || !online) return;
+  checking = true;
+  try {
+    const st = status();
+    const j = await api({ action: "checkin", store: P.brand.name, owner: P.owner.name, mobile: P.owner.mobile, storeType: P.storeType || "", version: CFG.version, plan: st.plan, start: iso(st.start), exp: iso(st.exp), device: deviceInfo });
+    if (j && j.license && j.license !== P.license) {
+      const pl = await verifyLicense(j.license), cur = LIC ? fromIso(LIC.exp) : P.trial.exp;
+      if (pl && pl.dev === P.deviceId && fromIso(pl.exp) > cur) {
+        P.license = j.license; P.lastRequest = null; await refreshLicense(); save(true); render();
+        openModal(`<div class="mhead"><h2>OwnPOS renewed</h2><button class="x" data-act="closemodal" aria-label="Close">×</button></div><p>Salamat! Your payment was confirmed. OwnPOS is active until <b>${fmtDayLong(fromIso(pl.exp))}</b>.</p><button class="btn primary block" data-act="closemodal">OK</button>`);
+        checking = false; return checkin();
+      }
+    }
+    if (j) { P.lastCheckin = Date.now(); save(); }
+  } catch (e) {}
+  checking = false;
+}
 
 /* =========================================================
    RENDER
@@ -238,7 +288,7 @@ function render() {
       <nav class="nav" aria-label="Main">${tabs.map(([k, l]) => `<button data-act="tab" data-v="${k}" ${tab === k ? 'aria-current="page"' : ""}>${icon(k)}${l}</button>`).join("")}</nav>
       <div class="grow"></div>
       ${owner ? `<button class="plancard" data-act="tab" data-v="sub"><b class="small">${st.plan === "Trial" ? "Free trial" : st.plan + " plan"}</b><span class="small muted">${planLine(st)}</span><div class="bar"><i style="width:${(used / total) * 100}%"></i></div></button>` : ""}
-      <label class="role">Signed in as <select data-act-change="role"><option value="owner" ${owner ? "selected" : ""}>Owner</option><option value="cashier" ${!owner ? "selected" : ""}>Cashier</option></select></label>
+      <div class="role"><label for="roleSel">Signed in as</label><select id="roleSel" data-act-change="role"><option value="owner" ${owner ? "selected" : ""}>Owner</option><option value="cashier" ${!owner ? "selected" : ""}>Cashier</option></select>${hb("role")}</div>
     </aside>
     <div class="main">
       <div class="phonehead"><div class="logo">${logo}</div><select class="inp" style="width:auto;min-height:38px;padding:6px 8px;font-size:13px" data-act-change="role" aria-label="Signed in as"><option value="owner" ${owner ? "selected" : ""}>Owner</option><option value="cashier" ${!owner ? "selected" : ""}>Cashier</option></select></div>
@@ -280,6 +330,7 @@ function renderSetup() {
       <label class="f" for="s-mobile">Mobile number<input class="inp" id="s-mobile" type="tel" required placeholder="0917 123 4567" autocomplete="tel"></label>
       <div class="f">Type of store<div class="opts">${Object.entries(TEMPLATES).map(([k, t]) => `<button type="button" data-act="setuptype" data-v="${k}" aria-pressed="${setupType === k}">${t.label}</button>`).join("")}</div></div>
       <p class="small muted" style="margin:0">We’ll add a starter menu and colours for this type. You can change everything later.</p>
+      <p class="small muted" style="margin:0;background:var(--surface-2);padding:10px 12px;border-radius:12px">Your sales, menu and customers stay on this device. OwnPOS only receives your store name, your name and number, and your plan dates, so we can manage your subscription.</p>
       <button class="btn lg block own" type="submit">Start my free trial</button>
     </form>
     <span class="btn filebtn" style="align-self:center;border:0;color:var(--muted);font-weight:600">Restore from a backup file<input type="file" accept="application/json,.json" data-act-change="restore"></span>
@@ -312,7 +363,7 @@ function cartHTML(st) {
   const lines = cart.map(l => { const p = P.products.find(x => x.id === l.id); if (!p) return ""; return `<div class="line"><div class="ln">${esc(p.name)}<div class="muted small num">${peso0(p.price)} each</div></div>
     <div class="qty"><button data-act="dec" data-v="${l.id}" aria-label="One less">−</button><span>${l.qty}</span><button data-act="inc" data-v="${l.id}" aria-label="One more">+</button></div>
     <div class="num" style="font-weight:800;min-width:72px;text-align:right">${peso(p.price * l.qty)}</div></div>`; }).join("");
-  return `<div class="row" style="justify-content:space-between"><h2>Current order</h2>${cart.length ? `<button class="btn" style="min-height:36px;padding:6px 12px;font-size:13px" data-act="clearcart">Clear</button>` : ""}</div>
+  return `<div class="row" style="justify-content:space-between"><h2>Current order ${hb("order")}</h2>${cart.length ? `<button class="btn" style="min-height:36px;padding:6px 12px;font-size:13px" data-act="clearcart">Clear</button>` : ""}</div>
     <div class="otype" role="group" aria-label="Order type" style="margin-top:12px">${[["Dine in", "dine"], ["Take out", "take"], ["Delivery", "deliv"]].map(([l, i]) => `<button data-act="otype" data-v="${l}" aria-pressed="${P.orderType === l}">${icon(i)}${l}</button>`).join("")}</div>
     ${cart.length ? `<div class="lines">${lines}</div>
     <div class="row" style="gap:8px;margin:4px 0 8px"><span class="small muted" style="font-weight:700">Discount</span><div class="opts"><button data-act="disc" data-v="none" aria-pressed="${discount === "none"}">None</button><button data-act="disc" data-v="scpwd" aria-pressed="${discount === "scpwd"}">Senior / PWD 20%</button></div></div>
@@ -372,11 +423,11 @@ function renderSales(st) {
   const list = P.sales.slice().reverse().slice(0, 100);
   return `<div class="tiles"><div class="tile"><div class="k">Sales today</div><div class="v">${peso0(total)}</div></div><div class="tile"><div class="k">Transactions</div><div class="v">${todays.length}</div></div><div class="tile"><div class="k">Average sale</div><div class="v">${peso0(todays.length ? total / todays.length : 0)}</div></div><div class="tile"><div class="k">Best seller</div><div class="v" style="font-size:17px;padding-top:6px">${top ? esc(top[0]) + ` <span class="muted small">×${top[1]}</span>` : "—"}</div></div></div>
     <div class="grid2" style="grid-template-columns:2fr 1fr">
-      <div class="card"><div class="row" style="justify-content:space-between;margin-bottom:6px"><h2>Receipts</h2>${P.role === "owner" ? `<button class="btn" style="min-height:36px;padding:6px 12px;font-size:13px" data-act="csv">Export CSV</button>` : ""}</div>
+      <div class="card"><div class="row" style="justify-content:space-between;margin-bottom:6px"><h2>Receipts ${hb("receipts")}</h2>${P.role === "owner" ? `<button class="btn" style="min-height:36px;padding:6px 12px;font-size:13px" data-act="csv">Export CSV</button>` : ""}</div>
         <div class="tablewrap"><table class="t"><thead><tr><th>No.</th><th>Time</th><th>Paid by</th><th style="text-align:right">Total</th></tr></thead><tbody>
         ${list.map(s => `<tr data-act="receipt" data-v="${s.no}"><td class="num">#${s.no}</td><td class="num">${fmtDT(s.ts)}</td><td>${esc(s.method)}</td><td class="num" style="text-align:right;font-weight:800">${peso(s.total)}</td></tr>`).join("") || `<tr><td colspan="4" class="empty">No sales yet.</td></tr>`}</tbody></table></div></div>
-      <div class="stack"><div class="card stack"><h2>Today by payment</h2>${["Cash", "GCash", "Maya"].map(m => `<div class="sum"><span>${m}</span><span>${peso(byM(m))}</span></div>`).join("")}</div>
-        <div class="card stack"><h2>Check a receipt photo</h2><p class="small muted" style="margin:0">Type the receipt number and verification code from a customer’s photo to confirm it’s real.</p>
+      <div class="stack"><div class="card stack"><h2>Today by payment ${hb("bymethod")}</h2>${["Cash", "GCash", "Maya"].map(m => `<div class="sum"><span>${m}</span><span>${peso(byM(m))}</span></div>`).join("")}</div>
+        <div class="card stack"><h2>Check a receipt photo ${hb("verify")}</h2><p class="small muted" style="margin:0">Type the receipt number and verification code from a customer’s photo to confirm it’s real.</p>
           <label class="f" for="vno">Receipt no.<input class="inp num" id="vno" inputmode="numeric" placeholder="000003"></label><label class="f" for="vcode">Verification code<input class="inp num" id="vcode" placeholder="7F3A-91C2"></label>
           <button class="btn" data-act="verify">Check receipt</button><div id="vres"></div></div></div></div>`;
 }
@@ -384,9 +435,9 @@ function renderSales(st) {
 /* ---------- menu ---------- */
 function renderMenu() {
   return `<div class="grid2" style="grid-template-columns:2fr 1fr">
-    <div class="card"><div class="row" style="justify-content:space-between;margin-bottom:6px"><h2>Items <span class="muted small">(${P.products.length})</span></h2><button class="btn primary" data-act="editprod" data-v="">Add item</button></div>
+    <div class="card"><div class="row" style="justify-content:space-between;margin-bottom:6px"><h2>Items ${hb("items")} <span class="muted small">(${P.products.length})</span></h2><button class="btn primary" data-act="editprod" data-v="">Add item</button></div>
       ${P.categories.map(c => { const items = P.products.filter(p => p.cat === c); return `<h3 class="muted" style="margin:16px 0 2px;font-size:12px;text-transform:uppercase;letter-spacing:.05em">${esc(c)}</h3>` + (items.map(p => `<div class="mrow"><div class="thumb" style="${p.img ? `background-image:url(${p.img})` : `background:${catColor(p.cat)}`}">${p.img ? "" : esc(initials(p.name))}</div><div><div style="font-weight:700">${esc(p.name)}</div><div class="small muted num">${peso(p.price)}</div></div><label class="switch" title="Available"><input type="checkbox" data-act-change="toggleon" data-v="${p.id}" ${p.on ? "checked" : ""} aria-label="${esc(p.name)} available"><span></span></label><button class="btn" style="min-height:38px;padding:6px 12px;font-size:13px" data-act="editprod" data-v="${p.id}">Edit</button></div>`).join("") || `<div class="small muted" style="padding:6px 0">No items yet.</div>`); }).join("")}</div>
-    <div class="stack"><div class="card stack"><h2>Categories</h2>
+    <div class="stack"><div class="card stack"><h2>Categories ${hb("categories")}</h2>
       ${P.categories.map((c, i) => `<div class="row" style="justify-content:space-between"><span style="font-weight:700">${esc(c)}</span><span class="row" style="gap:4px"><button class="btn" style="min-height:36px;padding:4px 10px" data-act="catup" data-v="${i}" aria-label="Move up" ${i ? "" : "disabled"}>↑</button><button class="btn danger" style="min-height:36px;padding:4px 10px;font-size:13px" data-act="catdel" data-v="${i}">Remove</button></span></div>`).join("")}
       <div class="row"><input class="inp" id="newcat" placeholder="New category" style="flex:1;min-width:120px"><button class="btn" data-act="catadd">Add</button></div></div></div></div>`;
 }
@@ -408,24 +459,24 @@ function renderBrand() {
   const b = P.brand;
   const sample = P.sales[P.sales.length - 1] || { no: "000001", ts: Date.now(), items: [{ name: "Sample item", price: 100, qty: 1 }], sub: 100, total: 100, lessVat: 0, disc: 0, vat: 0, vatable: 0, method: "Cash", tendered: 100, change: 0, ref: "", cashier: "Owner", code: "ABCD-1234", scId: "", orderType: "Dine in" };
   return `<div class="grid2" style="grid-template-columns:3fr 2fr"><div class="stack">
-      <div class="card stack"><h2>Quick themes</h2><div class="presets">${PRESETS.map(p => `<button class="preset" data-act="preset" data-v="${p.id}"><div class="pv" style="background:${p.color};color:${inkFor(p.color)};font-family:'${p.font}'">${esc((b.name.split(" ")[0]) || "Store")}</div><div class="pl">${p.label}</div></button>`).join("")}</div></div>
-      <div class="card stack"><h2>Store details</h2>
+      <div class="card stack"><h2>Quick themes ${hb("themes")}</h2><div class="presets">${PRESETS.map(p => `<button class="preset" data-act="preset" data-v="${p.id}"><div class="pv" style="background:${p.color};color:${inkFor(p.color)};font-family:'${p.font}'">${esc((b.name.split(" ")[0]) || "Store")}</div><div class="pl">${p.label}</div></button>`).join("")}</div></div>
+      <div class="card stack"><h2>Store details ${hb("storedetails")}</h2>
         <div class="logoup"><div class="lp">${b.logo ? `<img src="${b.logo}" alt="Logo">` : esc(initials(b.name))}</div><span class="btn filebtn">Upload logo<input type="file" accept="image/*" data-act-change="logo"></span>${b.logo ? `<button class="btn danger" data-act="logoclear">Remove</button>` : ""}</div>
         <label class="f" for="bname">Store name<input class="inp" id="bname" data-brand="name" value="${esc(b.name)}"></label>
         <label class="f" for="btag">Tagline<input class="inp" id="btag" data-brand="tagline" value="${esc(b.tagline)}"></label>
         <label class="f" for="baddr">Address (on receipts)<input class="inp" id="baddr" data-brand="address" value="${esc(b.address)}"></label>
         <label class="f" for="btin">TIN (optional)<input class="inp num" id="btin" data-brand="tin" value="${esc(b.tin)}"></label></div>
-      <div class="card stack"><h2>Look and feel</h2>
+      <div class="card stack"><h2>Look and feel ${hb("look")}</h2>
         <div class="f">Brand colour<div class="swatches">${SWATCHES.map(c => `<button data-act="color" data-v="${c}" style="background:${c}" aria-label="Colour ${c}" aria-pressed="${b.color.toLowerCase() === c.toLowerCase()}"></button>`).join("")}<input type="color" data-brand="color" value="${b.color}" aria-label="Custom colour" style="width:44px;height:38px;border:0;background:none;padding:0"></div></div>
         <div class="f">Font<div class="opts">${FONTS.map(f => `<button data-act="font" data-v="${f}" aria-pressed="${b.font === f}" style="font-family:'${f}'">${f}</button>`).join("")}</div></div>
         <div class="f">Corners<div class="opts">${[["round", "Round"], ["soft", "Soft"], ["square", "Square"]].map(([k, l]) => `<button data-act="corners" data-v="${k}" aria-pressed="${b.corners === k}">${l}</button>`).join("")}</div></div>
         <div class="f">Item buttons<div class="opts">${[["comfortable", "Large"], ["compact", "Compact"]].map(([k, l]) => `<button data-act="tilesz" data-v="${k}" aria-pressed="${b.tile === k}">${l}</button>`).join("")}<button data-act="photos" aria-pressed="${b.photos}">${b.photos ? "Photos on" : "Photos off"}</button></div></div></div>
-      <div class="card stack"><h2>Receipt</h2>
+      <div class="card stack"><h2>Receipt ${hb("receiptset")}</h2>
         <label class="f" for="bfoot">Message at the bottom<input class="inp" id="bfoot" data-brand="footer" value="${esc(b.footer)}"></label>
         <label class="row" style="font-weight:700"><input type="checkbox" data-brand-check="receiptLogo" ${b.receiptLogo ? "checked" : ""}> Show logo on receipt</label>
         <label class="row" style="font-weight:700"><input type="checkbox" data-brand-check="vat" ${b.vat ? "checked" : ""}> VAT-registered (prices include 12% VAT)</label></div>
     </div>
-    <div class="stack"><div class="card stack"><h2>Receipt preview</h2><div id="rprev">${receiptHTML(sample)}</div></div></div></div>`;
+    <div class="stack"><div class="card stack"><h2>Receipt preview ${hb("rpreview")}</h2><div id="rprev">${receiptHTML(sample)}</div></div></div></div>`;
 }
 
 /* ---------- subscription ---------- */
@@ -438,19 +489,20 @@ function renderSub(st) {
   const plan = PLANS.find(p => p.id === selPlan);
   const payLine = CFG.gcashNumber ? `Send <b>${peso0(plan.price)}</b> by GCash to <b>${esc(CFG.gcashName || "OwnPOS")}</b> · <b class="num">${esc(CFG.gcashNumber)}</b>.` : `Message OwnPOS for payment details at <b>${esc(CFG.email)}</b>.`;
   return `<div class="grid2"><div class="stack">
-      <div class="card stack"><div class="row" style="justify-content:space-between"><h2>${st.plan === "Trial" ? "30-day free trial" : esc(st.plan) + " plan"}</h2>${chip}</div>
+      <div class="card stack"><div class="row" style="justify-content:space-between"><h2>${st.plan === "Trial" ? "30-day free trial" : esc(st.plan) + " plan"} ${hb("plan")}</h2>${chip}</div>
         <div class="bigstat"><span class="d">${big[0]}</span><span class="muted" style="font-weight:700">${big[1]}</span></div>
         <div class="bar"><i style="width:${(used / total) * 100}%"></i></div>
         <dl class="kv"><dt>Started</dt><dd>${fmtDayLong(st.start)}</dd><dt>Ends</dt><dd>${fmtDayLong(st.exp)}</dd><dt>Selling pauses</dt><dd>${fmtDayLong(st.exp + 8)}</dd><dt>Device ID</dt><dd class="num">${P.deviceId}</dd></dl></div>
-      <div class="card stack"><h2>What happens next</h2><p class="small muted" style="margin:0">Worked out on this device. No internet needed.</p>
+      <div class="card stack"><h2>What happens next ${hb("timeline")}</h2><p class="small muted" style="margin:0">Worked out on this device. No internet needed.</p>
         <ul class="tl">${ev.map(e => `<li class="${e[0] <= st.today ? "done" : ""}"><span class="dt">${fmtDay(e[0])}</span><span class="dot"></span><span class="tx">${e[1]}</span></li>`).join("")}</ul></div>
     </div><div class="stack">
-      <div class="card stack"><h2>Renew OwnPOS</h2>
+      <div class="card stack"><h2>Renew OwnPOS ${hb("renew")}</h2>
         <div class="plans" role="group" aria-label="Plan">${PLANS.map(p => `<button class="plan" data-act="plan" data-v="${p.id}" aria-pressed="${selPlan === p.id}"><span><b>${p.label}</b>${p.save ? `<br><span class="small" style="color:var(--good);font-weight:700">${p.save}</span>` : ""}</span><b class="num">${peso0(p.price)}</b></button>`).join("")}</div>
-        <ol class="steps"><li>${payLine}</li><li>Enter the reference number, then tap <b>Send renewal request</b>. Choose Messenger, SMS or email.</li><li>When OwnPOS sends back your license, tap <b>Scan license</b> and point the camera at the QR code, or paste the code.</li></ol>
+        <ol class="steps"><li>${payLine}</li>${CFG.server ? `<li>Enter the reference number and tap <b>Send renewal request</b>.</li><li>Once OwnPOS confirms your payment, your new end date arrives on this device by itself.</li>` : `<li>Enter the reference number, then tap <b>Send renewal request</b>. Choose Messenger, SMS or email.</li><li>When OwnPOS sends back your license, tap <b>Scan license</b> and point the camera at the QR code, or paste the code.</li>`}</ol>
         <label class="f" for="rref">Payment reference no.<input class="inp num" id="rref" inputmode="numeric" placeholder="e.g. 1029 384 756"></label>
-        <button class="btn own lg" data-act="sendrequest">Send renewal request</button></div>
-      <div class="card stack"><h2>Activate a license</h2>
+        <button class="btn own lg" data-act="sendrequest">Send renewal request</button>${CFG.server && online ? `<button class="btn" style="border:0;color:var(--muted);font-weight:600" data-act="sharerequest">Or send it by Messenger or SMS</button>` : ""}
+        ${P.lastRequest && Date.now() - P.lastRequest.at < 7 * DAY ? `<div class="result good">Request sent ${fmtDT(P.lastRequest.at)} · GCash ref ${esc(P.lastRequest.ref)}. Your new end date arrives on this device by itself once OwnPOS confirms your payment, usually within the day. Keep OwnPOS connected to the internet.</div>` : ""}</div>
+      <div class="card stack"><h2>Activate a license ${hb("activate")}</h2>
         <button class="btn primary lg" data-act="scanlicense">Scan license QR</button>
         <label class="f" for="licIn">Or paste the message or code OwnPOS sent you<textarea class="inp mono" id="licIn" placeholder="OWNPOS1.…"></textarea></label>
         <button class="btn" data-act="activate">Activate code</button>${subMsg ? `<div class="result ${subMsg[0]}">${subMsg[1]}</div>` : ""}</div>
@@ -468,7 +520,7 @@ async function activate(token) {
   if (pl.dev !== P.deviceId) { subMsg = ["bad", `This license is for another device (${esc(pl.dev)}). This device is ${P.deviceId}.`]; render(); return; }
   const cur = LIC ? fromIso(LIC.exp) : P.trial.exp;
   if (fromIso(pl.exp) < cur) { subMsg = ["bad", "This license ends earlier than the one you already have."]; render(); return; }
-  P.license = token; await refreshLicense(); save(true);
+  P.license = token; P.lastRequest = null; await refreshLicense(); save(true); checkin();
   subMsg = ["good", `License activated. OwnPOS is active until ${fmtDayLong(fromIso(pl.exp))}.`]; render();
 }
 
@@ -477,18 +529,18 @@ let update = null; // {version, notes, url, page}
 function renderSettings() {
   const upd = update;
   return `<div class="grid2"><div class="stack">
-      <div class="card stack"><div class="row" style="justify-content:space-between"><h2>Updates</h2>${upd ? `<span class="chip warn">Update ready</span>` : online ? `<span class="chip good">Up to date</span>` : `<span class="chip info">Offline</span>`}</div>
+      <div class="card stack"><div class="row" style="justify-content:space-between"><h2>Updates ${hb("updates")}</h2>${upd ? `<span class="chip warn">Update ready</span>` : online ? `<span class="chip good">Up to date</span>` : `<span class="chip info">Offline</span>`}</div>
         <dl class="kv"><dt>This device</dt><dd>OwnPOS ${esc(CFG.version)}</dd><dt>Latest</dt><dd>${upd ? "OwnPOS " + esc(upd.version) : online ? "OwnPOS " + esc(CFG.version) : "Unknown while offline"}</dd><dt>Last checked</dt><dd>${P.lastCheck ? fmtDT(P.lastCheck) : "Not yet"}</dd></dl>
         <p class="small muted" style="margin:0">OwnPOS checks when it opens, every 6 hours, and when the internet comes back. Your sales and menu are kept when you update.</p>
         ${upd ? `<button class="btn primary" data-act="openupdate">See what’s new in ${esc(upd.version)}</button>` : `<button class="btn" data-act="checkupdate">Check for updates</button>`}<div id="chkres"></div></div>
-      <div class="card stack"><h2>Back up your data</h2>
+      <div class="card stack"><h2>Back up your data ${hb("backup")}</h2>
         <p class="small muted" style="margin:0">Your sales, menu and brand are saved only on this device. Save a backup file to Google Drive, email or a USB drive at least once a week.</p>
         <div class="row"><button class="btn primary" data-act="backup">Save a backup</button><span class="btn filebtn">Restore from backup<input type="file" accept="application/json,.json" data-act-change="restore"></span></div></div>
     </div><div class="stack">
-      <div class="card stack"><h2>Feedback</h2><p class="small muted" style="margin:0">Ideas, problems and praise go straight to the OwnPOS team.</p>
+      <div class="card stack"><h2>Feedback ${hb("feedback")}</h2><p class="small muted" style="margin:0">Ideas, problems and praise go straight to the OwnPOS team.</p>
         <button class="btn primary" data-act="openfeedback">Send feedback</button>
         ${P.outbox.length ? `<div class="result warn">${P.outbox.length} feedback waiting. It sends automatically when you’re back online.</div>` : ""}</div>
-      <div class="card stack"><h2>About this device</h2><dl class="kv"><dt>Store</dt><dd>${esc(P.brand.name)}</dd><dt>Owner</dt><dd>${esc(P.owner.name)} · ${esc(P.owner.mobile)}</dd><dt>Device ID</dt><dd class="num">${P.deviceId}</dd><dt>App</dt><dd>OwnPOS ${esc(CFG.version)}</dd><dt>Sales saved</dt><dd>${P.sales.length}</dd></dl></div>
+      <div class="card stack"><h2>About this device ${hb("about")}</h2><dl class="kv"><dt>Store</dt><dd>${esc(P.brand.name)}</dd><dt>Owner</dt><dd>${esc(P.owner.name)} · ${esc(P.owner.mobile)}</dd><dt>Device ID</dt><dd class="num">${P.deviceId}</dd><dt>App</dt><dd>OwnPOS ${esc(CFG.version)}</dd><dt>Sales saved</dt><dd>${P.sales.length}</dd></dl></div>
     </div></div>`;
 }
 async function checkUpdates(manual) {
@@ -528,6 +580,7 @@ function feedbackHTML() {
     <button class="btn" style="border:0;color:var(--muted);font-weight:600" data-act="emailfeedback">Or write an email instead</button></div>`;
 }
 async function postFeedback(item) {
+  if (CFG.server) { const j = await api({ action: "feedback", id: item.id, type: item.type, message: item.msg, email: item.email, meta: item.meta, store: item.store, owner: item.owner }); return !!j; }
   if (!CFG.web3formsKey) return false;
   const r = await fetch("https://api.web3forms.com/submit", { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ access_key: CFG.web3formsKey, subject: `OwnPOS feedback · ${item.type} · ${item.store}`, from_name: item.store, email: item.email || undefined, message: item.msg, type: item.type, store: item.store, owner: item.owner, device: item.meta || "not shared", sent: new Date(item.at).toString() }) });
@@ -535,7 +588,7 @@ async function postFeedback(item) {
 }
 let flushing = false;
 async function flushOutbox() {
-  if (flushing || !online || !P || !P.outbox.length || !CFG.web3formsKey) return;
+  if (flushing || !online || !P || !P.outbox.length || !(CFG.server || CFG.web3formsKey)) return;
   flushing = true; let sent = 0;
   for (const item of P.outbox.slice()) { try { if (await postFeedback(item)) { P.outbox = P.outbox.filter(x => x.id !== item.id); sent++; } else break; } catch (e) { break; } }
   flushing = false; if (sent) { save(); toast(`${sent} saved feedback sent`); render(); }
@@ -584,7 +637,18 @@ const A = {
   photos() { P.brand.photos = !P.brand.photos; save(); render(); },
   logoclear() { P.brand.logo = ""; save(); render(); },
   plan(el) { selPlan = el.dataset.v; const ref = $("#rref") ? $("#rref").value : ""; render(); if ($("#rref")) $("#rref").value = ref; },
-  sendrequest() { shareText("OwnPOS renewal request", requestText()); },
+  async sendrequest(el) {
+    const ref = ($("#rref") && $("#rref").value.trim()) || "";
+    if (CFG.server && online) {
+      if (!ref) { toast("Enter the GCash reference number first"); $("#rref").focus(); return; }
+      el.disabled = true; el.textContent = "Sending…";
+      let ok = false; try { ok = !!(await api({ action: "renewal", store: P.brand.name, owner: `${P.owner.name} · ${P.owner.mobile}`, plan: selPlan, ref, exp: iso(status().exp) })); } catch (e) {}
+      if (ok) { P.lastRequest = { at: Date.now(), plan: selPlan, ref }; save(); render(); toast("Renewal request sent"); return; }
+      toast("Couldn’t reach OwnPOS. Send it by message instead.");
+    }
+    shareText("OwnPOS renewal request", requestText());
+  },
+  sharerequest() { shareText("OwnPOS renewal request", requestText()); },
   async scanlicense() {
     const bs = plug("BarcodeScanner");
     if (!isNative || !bs) { toast("Camera scanning works in the Android app. Paste the code instead."); return; }
@@ -604,7 +668,7 @@ const A = {
   async sendfeedback() {
     if (!fb.msg.trim()) { toast("Write a message first"); return; }
     const item = { id: rnd(8), type: fb.type, msg: fb.msg.trim(), email: fb.email.trim(), meta: fb.meta ? metaLine() : "", store: P.brand.name, owner: `${P.owner.name} · ${P.owner.mobile}`, at: Date.now() };
-    if (!CFG.web3formsKey) { await openUrl(gmailLink(item)); fb.done = true; closeModal(); return; }
+    if (!CFG.server && !CFG.web3formsKey) { await openUrl(gmailLink(item)); fb.done = true; closeModal(); return; }
     let ok = false; if (online) { const btn = $('[data-act="sendfeedback"]'); btn.disabled = true; btn.textContent = "Sending…"; try { ok = await postFeedback(item); } catch (e) {} }
     if (!ok) { P.outbox.push(item); save(); }
     fb.done = true;
@@ -613,6 +677,7 @@ const A = {
   },
   async emailfeedback() { const item = { type: fb.type, msg: fb.msg.trim(), meta: fb.meta ? metaLine() : "" }; await openUrl(gmailLink(item)); },
   async backup() { await shareFile(`ownpos-backup-${P.brand.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-${iso(dayNum(Date.now()))}.json`, JSON.stringify(P), "application/json"); },
+  help(el) { const h = HELP[el.dataset.v]; if (!h) return; openModal(`<div class="mhead"><h2>${esc(h[0])}</h2><button class="x" data-act="closemodal" aria-label="Close">×</button></div><div class="stack"><p style="margin:0">${esc(h[1])}</p>${h[2] ? `<ul class="notes">${h[2].map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}<button class="btn primary block" data-act="closemodal">Got it</button></div>`); },
   closemodal() { closeModal(); }
 };
 function refreshCart() { const cm = $("#cartModal"); if (cm) { if (!cart.length) closeModal(); else cm.innerHTML = cartHTML(status()); } render(); }
@@ -628,7 +693,7 @@ document.addEventListener("submit", async e => {
   if (e.target.id === "setupForm") {
     const name = $("#s-name").value.trim(), owner = $("#s-owner").value.trim(), mobile = $("#s-mobile").value.trim();
     if (!name || !owner || !mobile) { toast("Fill in all three fields"); return; }
-    P = newStore({ name, owner, mobile, type: setupType }); await save(true); await refreshLicense(); tab = "sell"; render(); toast("Your store is ready. Free for 30 days."); checkUpdates();
+    P = newStore({ name, owner, mobile, type: setupType }); await save(true); await refreshLicense(); tab = "sell"; render(); toast("Your store is ready. Free for 30 days."); checkUpdates(); checkin();
   }
   if (e.target.id === "prodForm") {
     const id = e.target.dataset.id, name = $("#pname").value.trim(), price = parseFloat($("#pprice").value);
@@ -676,11 +741,11 @@ document.addEventListener("change", async e => {
   const app = plug("App");
   if (isNative && app) {
     app.addListener("backButton", () => { if (modalOpen()) closeModal(); else if (tab !== "sell") { tab = "sell"; render(); } else app.minimizeApp(); });
-    app.addListener("resume", () => { if (P && Date.now() - (P.lastCheck || 0) > 6 * 3600000) checkUpdates(); if (P) render(); });
+    app.addListener("resume", () => { if (P && Date.now() - (P.lastCheck || 0) > 6 * 3600000) checkUpdates(); if (P) { checkin(); render(); } });
     app.addListener("pause", () => { if (P) save(true); });
   }
   render();
-  if (P) { flushOutbox(); checkUpdates(); }
-  setInterval(() => { if (P && online && Date.now() - (P.lastCheck || 0) > 6 * 3600000) checkUpdates(); }, 15 * 60000);
+  if (P) { flushOutbox(); checkUpdates(); checkin(); }
+  setInterval(() => { if (P && online && Date.now() - (P.lastCheck || 0) > 6 * 3600000) checkUpdates(); if (P && online && Date.now() - (P.lastCheckin || 0) > 3600000) checkin(); }, 15 * 60000);
   setInterval(() => { if (P && !modalOpen() && tab !== "sell") render(); }, 60000);
 })();

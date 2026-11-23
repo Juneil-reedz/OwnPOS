@@ -37,6 +37,7 @@ const version = (process.env.OWNPOS_VERSION || pkg.version).replace(/^v/, "");
 const cfg = {
   version,
   repo: process.env.OWNPOS_REPO || "Juneil-reedz/OwnPOS",
+  server: process.env.OWNPOS_SERVER_URL || "",
   web3formsKey: process.env.WEB3FORMS_KEY || "",
   email: process.env.OWNPOS_EMAIL || "areedzgonzales@gmail.com",
   gcashName: process.env.GCASH_NAME || "Fatima Reedzqha Asaad",
@@ -44,4 +45,4 @@ const cfg = {
   publicKey,
 };
 fs.writeFileSync(path.join(www, "config.js"), "window.OWNPOS_CONFIG=" + JSON.stringify(cfg) + ";\n");
-console.log(`www ready · OwnPOS ${version} · feedback ${cfg.web3formsKey ? "on" : "email fallback"} · gcash ${cfg.gcashNumber ? "set" : "not set"}`);
+console.log(`www ready · OwnPOS ${version} · server ${cfg.server ? "on" : "not set"} · gcash ${cfg.gcashNumber ? "set" : "not set"}`);
